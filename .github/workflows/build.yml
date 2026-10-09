@@ -3,7 +3,7 @@ name: Build postmarketOS for xiaomi-xun
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [ci-trigger]
 
 jobs:
   build:
@@ -44,7 +44,6 @@ jobs:
             https://gitlab.postmarketos.org/postMarketOS/pmaports.git \
             $WORK/cache_git/pmaports
           echo 8 > $WORK/version
-          ls $WORK/cache_git/pmaports/ | head
 
       - name: Install xun packages into pmaports
         run: |
@@ -57,33 +56,19 @@ jobs:
           git add -A
           git -c user.email=ci@x -c user.name=ci commit -m "xun port"
 
-      - name: Write base pmbootstrap config
+      - name: Write pmbootstrap config
         run: |
-          mkdir -p $HOME/.config
-          cat > $HOME/.config/pmbootstrap_v3.cfg <<'CFG'
-          [pmbootstrap]
-          aports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports
-          ccache_size = 5G
-          device = xiaomi-xun
-          jobs = 4
-          kernel = mainline
-          keymap = us
-          locale = en_US.UTF-8
-          mirror_alpine = http://dl-cdn.alpinelinux.org/alpine
-          mirror_pmOS = http://mirror.postmarketos.org/postmarketos
-          pmbootstrap_version = 3.11.1
-          timezone = UTC
-          user = user
-          work = /home/runner/.local/var/pmbootstrap
-          CFG
-          sed -i 's/^          //' $HOME/.config/pmbootstrap_v3.cfg
-
-      - name: Force config via CLI
-        run: |
-          sudo -E pmbootstrap --as-root config systemd none || true
-          sudo -E pmbootstrap --as-root config ui none
+          sudo rm -f /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg
+          sudo -E pmbootstrap --as-root config aports /home/runner/.local/var/pmbootstrap/cache_git/pmaports
           sudo -E pmbootstrap --as-root config device xiaomi-xun
-          sudo -E pmbootstrap --as-root config channel edge || true
+          sudo -E pmbootstrap --as-root config systemd False
+          sudo -E pmbootstrap --as-root config ui none
+          sudo -E pmbootstrap --as-root config kernel mainline
+          sudo -E pmbootstrap --as-root config channel edge
+          sudo -E pmbootstrap --as-root config jobs 4
+          sudo -E pmbootstrap --as-root config work /home/runner/.local/var/pmbootstrap
+          sudo mkdir -p /root/.config $HOME/.config
+          sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
           echo "=== FINAL CONFIG ==="
           sudo -E pmbootstrap --as-root config
 
@@ -109,8 +94,8 @@ jobs:
       - name: Check ccache state
         if: always()
         run: |
-          sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "WORK/cache_ccache: MISSING"
-          sudo du -sh /root/.cache/ccache 2>/dev/null || echo "/root/.cache/ccache: MISSING"
+          sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
+          sudo du -sh /root/.cache/ccache 2>/dev/null || echo "MISSING"
 
       - name: Verify export contents
         if: always()
