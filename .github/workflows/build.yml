@@ -58,19 +58,25 @@ jobs:
         run: |
           mkdir -p $HOME/.config
           sudo mkdir -p /root/.config
-          echo "[pmbootstrap]" > $HOME/.config/pmbootstrap_v3.cfg
+          printf '%s\n' \
+            '[pmbootstrap]' \
+            'aports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports' \
+            'build_default_device_arch = False' \
+            'ccache_size = 5G' \
+            'device = xiaomi-xun' \
+            'is_default_channel = True' \
+            'jobs = 4' \
+            'kernel = mainline' \
+            'service_manager = openrc' \
+            'ui = none' \
+            'work = /home/runner/.local/var/pmbootstrap' \
+            > $HOME/.config/pmbootstrap_v3.cfg
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
-          sudo -E pmbootstrap --as-root config aports /home/runner/.local/var/pmbootstrap/cache_git/pmaports
-          sudo -E pmbootstrap --as-root config ccache_size 5G
-          sudo -E pmbootstrap --as-root config device xiaomi-xun
-          sudo -E pmbootstrap --as-root config service_manager openrc
-          sudo -E pmbootstrap --as-root config ui none
-          sudo -E pmbootstrap --as-root config kernel mainline
-          sudo -E pmbootstrap --as-root config is_default_channel True
-          sudo -E pmbootstrap --as-root config jobs 4
-          sudo -E pmbootstrap --as-root config work /home/runner/.local/var/pmbootstrap
           echo "=== FINAL CONFIG ==="
-          sudo -E pmbootstrap --as-root config
+          cat $HOME/.config/pmbootstrap_v3.cfg
+          echo ""
+          echo "=== pmbootstrap sees ==="
+          sudo -E pmbootstrap --as-root config 2>&1 | grep -E "device|service_manager|is_default_channel|ccache_size"
 
       - name: Prepare ccache dir
         run: |
