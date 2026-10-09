@@ -1,0 +1,85 @@
+name: Build postmarketOS for xiaomi-xun
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo add-apt-repository -y universe
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip git \
+            multipath-tools parted e2fsprogs expect android-sdk-libsparse-utils
+
+      - name: Clone pmbootstrap
+        run: |
+          git clone --depth=1 https://gitlab.postmarketos.org/postMarketOS/pmbootstrap.git $HOME/pmbootstrap
+          sudo ln -sf $HOME/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
+
+      - name: Init pmbootstrap
+        run: |
+          expect <<'EOF'
+          set timeout 900
+          spawn pmbootstrap init
+          expect "Work path"                { send "\r" }
+          expect "pmaports path"            { send "\r" }
+          expect "Channel"                  { send "edge\r" }
+          expect "Vendor"                   { send "xiaomi\r" }
+          expect "Device codename"          { send "xun\r" }
+          expect "Create a new device port" { send "y\r" }
+          expect "Device architecture"      { send "\r" }
+          expect "User interface"           { send "none\r" }
+          expect "Kernel"                   { send "mainline\r" }
+          expect "Chassis"                  { send "tablet\r" }
+          expect "Flash method"             { send "fastboot\r" }
+          expect "Known working boot.img"   { send "\r" }
+          expect "Boot partition size"      { send "\r" }
+          expect "Extra packages"           { send "\r" }
+          expect "Default locale"           { send "\r" }
+          expect "Default timezone"         { send "\r" }
+          expect "Default username"         { send "\r" }
+          expect "Device hostname"          { send "\r" }
+          expect "Change them"              { send "n\r" }
+          expect "Copy these public keys"   { send "n\r" }
+          expect "Build outdated packages"  { send "y\r" }
+          expect "Zap existing"             { send "y\r" }
+          expect eof
+          EOF
+
+      - name: Install device + kernel packages
+        run: |
+          PMA=$HOME/.local/var/pmbootstrap/cache_git/pmaports
+          rm -rf $PMA/device/testing/device-xiaomi-xun
+          cp -r device/testing/device-xiaomi-xun $PMA/device/testing/
+          rm -rf $PMA/device/archived/linux-postmarketos-qcom-sm6225
+          cp -r device/kernel-package $PMA/device/archived/linux-postmarketos-qcom-sm6225
+          cd $PMA
+          git add -A
+          git -c user.email=ci@x -c user.name=ci commit -m "xun port"
+
+      - name: Build kernel
+        run: pmbootstrap build --force linux-postmarketos-qcom-sm6225
+
+      - name: Build device package
+        run: pmbootstrap build --force device-xiaomi-xun
+
+      - name: Install
+        run: pmbootstrap install --password=147147
+
+      - name: Export
+        run: pmbootstrap export
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pmos-xun-images
+          path: /tmp/postmarketOS-export/
+          if-no-files-found: error
+          retention-days: 14
