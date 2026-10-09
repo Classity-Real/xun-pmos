@@ -54,7 +54,8 @@ jobs:
       - run:
           name: Write pmbootstrap config
           command: |
-            mkdir -p $HOME/.config /root/.config
+            mkdir -p $HOME/.config
+            sudo mkdir -p /root/.config
             echo "[pmbootstrap]" > $HOME/.config/pmbootstrap_v3.cfg
             sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
             sudo -E pmbootstrap --as-root config aports /home/circleci/.local/var/pmbootstrap/cache_git/pmaports
