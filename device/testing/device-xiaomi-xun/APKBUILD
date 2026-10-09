@@ -1,0 +1,33 @@
+# Reference: <https://postmarketos.org/devicepkg>
+maintainer="Classity-Real <uiportsarchives@gmail.com>"
+pkgname=device-xiaomi-xun
+pkgver=1
+pkgrel=0
+pkgdesc="Xiaomi Pad SE"
+url="https://postmarketos.org"
+arch="aarch64"
+license="MIT"
+depends="
+        linux-postmarketos-qcom-sm6225
+        mkbootimg
+        postmarketos-base
+        "
+makedepends="devicepkg-dev"
+source="
+        deviceinfo
+        modules-initfs
+        "
+options="!archcheck !check"
+
+build() {
+        devicepkg_build $startdir $pkgname
+}
+
+package() {
+        devicepkg_package $startdir $pkgname
+}
+
+sha512sums="
+6002b5280f24df70340d1dccf5a518671f037e064bad5769fe180ca98fa7397b4c672f59ba9664fc6aa2f3ed2a893302008eb90ab1e4241f50076e71d7052031  deviceinfo
+e70bae17df23dcaaaea0e2d3616556f04baa23f8ee1357785c0f539bf97282d8ddff53953e155b72689bb73beb38c2da3d08de2a61e866684edfa10a6593885d  modules-initfs
+"

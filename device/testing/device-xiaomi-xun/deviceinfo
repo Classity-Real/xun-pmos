@@ -1,0 +1,20 @@
+# Reference: <https://postmarketos.org/deviceinfo>
+deviceinfo_format_version="0"
+deviceinfo_name="Xiaomi Pad SE"
+deviceinfo_manufacturer="Xiaomi"
+deviceinfo_codename="xiaomi-xun"
+deviceinfo_year="2023"
+deviceinfo_dtb="qcom/sm6225-lenovo-tb128fu"
+deviceinfo_append_dtb="true"
+deviceinfo_arch="aarch64"
+
+# Device related
+deviceinfo_chassis="tablet"
+deviceinfo_screen_width="1920"
+deviceinfo_screen_height="1200"
+
+# Bootloader related
+deviceinfo_flash_method="fastboot"
+deviceinfo_generate_bootimg="true"
+deviceinfo_bootimg_qcdt="false"
+deviceinfo_flash_pagesize="4096"
