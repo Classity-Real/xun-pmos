@@ -1,10 +1,7 @@
-git add 
-.github/workflows/build.ymlname: 
-Build postmarketOS for 
-xiaomi-xun git commit -m 
-"Debug: dump all init 
-prompts" on:
-git push  workflow_dispatch:
+name: Build postmarketOS
+
+on:
+  workflow_dispatch:
   push:
     branches: [main]
 
