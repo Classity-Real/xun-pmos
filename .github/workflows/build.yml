@@ -1,7 +1,10 @@
-name: Build postmarketOS for xiaomi-xun
-
-on:
-  workflow_dispatch:
+git add 
+.github/workflows/build.ymlname: 
+Build postmarketOS for 
+xiaomi-xun git commit -m 
+"Debug: dump all init 
+prompts" on:
+git push  workflow_dispatch:
   push:
     branches: [main]
 
@@ -23,49 +26,21 @@ jobs:
         run: |
           git clone --depth=1 https://gitlab.postmarketos.org/postMarketOS/pmbootstrap.git $HOME/pmbootstrap
           sudo ln -sf $HOME/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
-
+      
       - name: Init pmbootstrap
         run: |
-          expect <<'EOF'
-          set timeout 30
+          cat > /tmp/init.exp <<'EXPEOF'
+          set timeout 120
           log_user 1
           spawn pmbootstrap init
-
-          # Work path
-          expect -re {Work path\s*\[[^\]]*\]:\s*$} { send "\r" }
-
-          # pmaports path - may or may not appear, use a combined matcher
           expect {
-            -re {pmaports path\s*\[[^\]]*\]:\s*$} { send "\r"; exp_continue }
-            -re {Channel\s*\[edge\]:\s*$}           { send "edge\r" }
-            timeout { puts "STUCK after pmaports path"; exit 1 }
+              -re "\\?"  { send "\r"; exp_continue }
+              -re ":"   { send "\r"; exp_continue }
+              eof       { }
+              timeout   { puts "\n\n=== TIMEOUT - last 30 lines above are the prompts ===\n"; exit 0 }
           }
-
-          expect -re {Vendor\s*\[[^\]]*\]:\s*$}            { send "xiaomi\r" }
-          expect -re {Device codename:\s*$}                { send "xun\r" }
-          expect {
-            -re {not found.*Add it now\?.*\[y\]:\s*$}      { send "y\r" }
-            -re {Create a new device port\?.*\[y\]:\s*$}   { send "y\r" }
-            timeout { puts "STUCK at create-device prompt"; exit 1 }
-          }
-          expect -re {architecture.*\[aarch64\]:\s*$}      { send "\r" }
-          expect -re {User interface:}                     { send "none\r" }
-          expect -re {Kernel.*\[mainline\]:\s*$}           { send "\r" }
-          expect -re {Chassis:\s*$}                        { send "tablet\r" }
-          expect -re {Flash method:\s*$}                   { send "fastboot\r" }
-          expect -re {Known working boot.img\?.*:\s*$}     { send "\r" }
-          expect -re {Boot partition size.*:\s*$}          { send "\r" }
-          expect -re {Extra packages.*:\s*$}               { send "\r" }
-          expect -re {Default locale.*:\s*$}               { send "\r" }
-          expect -re {Default timezone.*:\s*$}             { send "\r" }
-          expect -re {Default username.*:\s*$}             { send "\r" }
-          expect -re {Device hostname.*:\s*$}              { send "\r" }
-          expect -re {Change them\?.*\[n\]:\s*$}           { send "n\r" }
-          expect -re {Copy these public keys.*\[n\]:\s*$}  { send "n\r" }
-          expect -re {Build outdated packages.*\[y\]:\s*$} { send "y\r" }
-          expect -re {Zap existing.*\[y\]:\s*$}            { send "y\r" }
-          expect eof
-          EOF
+          EXPEOF
+          expect -f /tmp/init.exp || true
 
       - name: Install device + kernel packages
         run: |
