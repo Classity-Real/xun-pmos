@@ -54,27 +54,19 @@ jobs:
       - run:
           name: Write pmbootstrap config
           command: |
-            mkdir -p $HOME/.config
-            printf '%s\n' \
-              '[pmbootstrap]' \
-              'channel = edge' \
-              'aports = /home/circleci/.local/var/pmbootstrap/cache_git/pmaports' \
-              'ccache_size = 5G' \
-              'device = xiaomi-xun' \
-              'jobs = 4' \
-              'kernel = mainline' \
-              'keymap = us' \
-              'locale = en_US.UTF-8' \
-              'mirror_alpine = http://dl-cdn.alpinelinux.org/alpine' \
-              'mirror_pmOS = http://mirror.postmarketos.org/postmarketos' \
-              'systemd = False' \
-              'timezone = UTC' \
-              'ui = none' \
-              'user = user' \
-              'work = /home/circleci/.local/var/pmbootstrap' \
-              > $HOME/.config/pmbootstrap_v3.cfg
-            echo "--- config written ---"
-            cat $HOME/.config/pmbootstrap_v3.cfg
+            sudo rm -f /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg
+            sudo -E pmbootstrap --as-root config aports /home/circleci/.local/var/pmbootstrap/cache_git/pmaports
+            sudo -E pmbootstrap --as-root config device xiaomi-xun
+            sudo -E pmbootstrap --as-root config systemd False
+            sudo -E pmbootstrap --as-root config ui none
+            sudo -E pmbootstrap --as-root config kernel mainline
+            sudo -E pmbootstrap --as-root config channel edge
+            sudo -E pmbootstrap --as-root config jobs 4
+            sudo -E pmbootstrap --as-root config work /home/circleci/.local/var/pmbootstrap
+            sudo mkdir -p /root/.config $HOME/.config
+            sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
+            echo "=== FINAL CONFIG ==="
+            sudo -E pmbootstrap --as-root config
 
       - run:
           name: Prepare ccache dir
@@ -116,16 +108,14 @@ jobs:
           name: Check ccache state
           when: always
           command: |
-            sudo du -sh /home/circleci/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "WORK/cache_ccache: MISSING"
-            sudo du -sh /root/.cache/ccache 2>/dev/null || echo "/root/.cache/ccache: MISSING"
+            sudo du -sh /home/circleci/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
+            sudo du -sh /root/.cache/ccache 2>/dev/null || echo "MISSING"
 
       - run:
           name: Verify export contents
           when: always
           command: |
-            echo "--- /tmp/postmarketOS-export ---"
             sudo ls -la /tmp/postmarketOS-export/ || true
-            echo "--- DTB check ---"
             sudo dtc -I dtb -O dts /tmp/postmarketOS-export/dtbs/qcom/sm6225-xiaomi-xun.dtb 2>/dev/null | grep -E "model|compatible|board-id" || true
 
       - store_artifacts:
