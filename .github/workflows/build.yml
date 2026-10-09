@@ -27,35 +27,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip git \
             multipath-tools parted e2fsprogs \
-            android-sdk-libsparse-utils
+            android-sdk-libsparse-utils device-tree-compiler
 
       - name: Clone pmbootstrap
         run: |
           git clone --depth=1 https://gitlab.postmarketos.org/postMarketOS/pmbootstrap.git $HOME/pmbootstrap
           sudo ln -sf $HOME/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
-      - name: Clone pmaports explicitly
+      - name: Clone pmaports
         run: |
           WORK=$HOME/.local/var/pmbootstrap
           mkdir -p $WORK/cache_git
           git clone --depth=1 \
             https://gitlab.postmarketos.org/postMarketOS/pmaports.git \
             $WORK/cache_git/pmaports
-          echo "--- pmaports cloned ---"
           ls $WORK/cache_git/pmaports/ | head
 
-      - name: Bootstrap pmbootstrap config
-        run: |
-          rm -f $HOME/.config/pmbootstrap_v3.cfg
-          pmbootstrap -y init \
-            --work $HOME/.local/var/pmbootstrap \
-            --device qemu-amd64 \
-            --ui none \
-            --kernel mainline
-          echo "--- config written ---"
-          cat $HOME/.config/pmbootstrap_v3.cfg
-
-      - name: Install xun device + kernel packages
+      - name: Install xun packages into pmaports
         run: |
           PMA=$HOME/.local/var/pmbootstrap/cache_git/pmaports
           rm -rf $PMA/device/testing/device-xiaomi-xun
@@ -66,11 +54,37 @@ jobs:
           git add -A
           git -c user.email=ci@x -c user.name=ci commit -m "xun port"
 
-      - name: Switch to xun device
+      - name: Write pmbootstrap config
         run: |
-          pmbootstrap -y config device xiaomi-xun
-          echo "--- config check ---"
-          grep -iE "device|kernel|ui" $HOME/.config/pmbootstrap_v3.cfg
+          mkdir -p $HOME/.config
+          cat > $HOME/.config/pmbootstrap_v3.cfg <<'CFG'
+          [pmbootstrap]
+          aports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports
+          ccache_size = 5G
+          channel = edge
+          device = xiaomi-xun
+          extra_packages = 
+          is_default_channel = True
+          jobs = 4
+          kernel = mainline
+          keymap = us
+          locale = en_US.UTF-8
+          mirror_alpine = http://dl-cdn.alpinelinux.org/alpine
+          mirror_pmOS = http://mirror.postmarketos.org/postmarketos
+          pmbootstrap_version = 3.11.1
+          sudo_timer = False
+          systemd = none
+          timezone = UTC
+          ui = none
+          user = user
+          work = /home/runner/.local/var/pmbootstrap
+          CFG
+
+          # Strip leading whitespace from heredoc
+          sed -i 's/^          //' $HOME/.config/pmbootstrap_v3.cfg
+
+          echo "--- config ---"
+          cat $HOME/.config/pmbootstrap_v3.cfg
 
       - name: Prepare ccache dir
         run: |
