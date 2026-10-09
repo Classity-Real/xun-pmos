@@ -67,10 +67,8 @@ jobs:
             sudo -E pmbootstrap --as-root config is_default_channel True
             sudo -E pmbootstrap --as-root config jobs 4
             sudo -E pmbootstrap --as-root config work /home/circleci/.local/var/pmbootstrap
-            sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
-            sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg 2>/dev/null || true
-            echo "=== FINAL CONFIG ==="
-            sudo cat /root/.config/pmbootstrap_v3.cfg
+            echo "=== effective config (pmbootstrap config) ==="
+            sudo -E pmbootstrap --as-root config
 
       - run:
           name: Prepare ccache dir

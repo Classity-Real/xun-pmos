@@ -60,6 +60,7 @@ jobs:
           sudo mkdir -p /root/.config
           echo "[pmbootstrap]" > $HOME/.config/pmbootstrap_v3.cfg
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
+
           sudo -E pmbootstrap --as-root config aports /home/runner/.local/var/pmbootstrap/cache_git/pmaports
           sudo -E pmbootstrap --as-root config ccache_size 5G
           sudo -E pmbootstrap --as-root config device xiaomi-xun
@@ -69,10 +70,9 @@ jobs:
           sudo -E pmbootstrap --as-root config is_default_channel True
           sudo -E pmbootstrap --as-root config jobs 4
           sudo -E pmbootstrap --as-root config work /home/runner/.local/var/pmbootstrap
-          sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
-          sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg 2>/dev/null || true
-          echo "=== FINAL CONFIG ==="
-          sudo cat /root/.config/pmbootstrap_v3.cfg
+
+          echo "=== effective config (pmbootstrap config) ==="
+          sudo -E pmbootstrap --as-root config
 
       - name: Prepare ccache dir
         run: |
