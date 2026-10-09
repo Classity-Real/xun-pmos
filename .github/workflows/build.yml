@@ -60,7 +60,6 @@ jobs:
           sudo mkdir -p /root/.config
           echo "[pmbootstrap]" > $HOME/.config/pmbootstrap_v3.cfg
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
-
           sudo -E pmbootstrap --as-root config aports /home/runner/.local/var/pmbootstrap/cache_git/pmaports
           sudo -E pmbootstrap --as-root config ccache_size 5G
           sudo -E pmbootstrap --as-root config device xiaomi-xun
@@ -70,8 +69,7 @@ jobs:
           sudo -E pmbootstrap --as-root config is_default_channel True
           sudo -E pmbootstrap --as-root config jobs 4
           sudo -E pmbootstrap --as-root config work /home/runner/.local/var/pmbootstrap
-
-          echo "=== effective config (pmbootstrap config) ==="
+          echo "=== FINAL CONFIG ==="
           sudo -E pmbootstrap --as-root config
 
       - name: Prepare ccache dir
@@ -100,6 +98,15 @@ jobs:
         run: |
           sudo ls -la /tmp/postmarketOS-export/ || true
           sudo dtc -I dtb -O dts /tmp/postmarketOS-export/dtbs/qcom/sm6225-xiaomi-xun.dtb 2>/dev/null | grep -E "model|compatible|board-id" || true
+
+      - name: Dump pmbootstrap log
+        if: always()
+        run: |
+          echo "=========== log.txt tail (200) ==========="
+          sudo tail -n 200 /home/runner/.local/var/pmbootstrap/log.txt 2>/dev/null || echo "log.txt not found"
+          echo ""
+          echo "=========== export dir ==========="
+          sudo ls -la /tmp/postmarketOS-export/ 2>/dev/null || echo "empty"
 
       - name: Fix artifact permissions
         if: always()
