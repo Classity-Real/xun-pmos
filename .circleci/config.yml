@@ -1,0 +1,145 @@
+version: 2.1
+
+jobs:
+  build:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: arm.large
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - ccache-sm6225-v1-{{ .Branch }}-{{ .Revision }}
+            - ccache-sm6225-v1-{{ .Branch }}-
+            - ccache-sm6225-v1-
+
+      - run:
+          name: Install dependencies
+          command: |
+            sudo add-apt-repository -y universe
+            sudo apt-get update
+            sudo apt-get install -y python3 python3-pip git \
+              multipath-tools parted e2fsprogs \
+              android-sdk-libsparse-utils device-tree-compiler
+
+      - run:
+          name: Clone pmbootstrap
+          command: |
+            git clone --depth=1 https://gitlab.postmarketos.org/postMarketOS/pmbootstrap.git $HOME/pmbootstrap
+            sudo ln -sf $HOME/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
+
+      - run:
+          name: Clone pmaports
+          command: |
+            WORK=$HOME/.local/var/pmbootstrap
+            mkdir -p $WORK/cache_git
+            git clone --depth=1 \
+              https://gitlab.postmarketos.org/postMarketOS/pmaports.git \
+              $WORK/cache_git/pmaports
+            echo 8 > $WORK/version
+
+      - run:
+          name: Install xun packages into pmaports
+          command: |
+            PMA=$HOME/.local/var/pmbootstrap/cache_git/pmaports
+            rm -rf $PMA/device/testing/device-xiaomi-xun
+            cp -r device/testing/device-xiaomi-xun $PMA/device/testing/
+            rm -rf $PMA/device/archived/linux-postmarketos-qcom-sm6225
+            cp -r device/kernel-package $PMA/device/archived/linux-postmarketos-qcom-sm6225
+            cd $PMA
+            git add -A
+            git -c user.email=ci@x -c user.name=ci commit -m "xun port"
+
+      - run:
+          name: Write pmbootstrap config
+          command: |
+            mkdir -p $HOME/.config
+            cat > $HOME/.config/pmbootstrap_v3.cfg <<'CFG'
+            [pmbootstrap]
+            aports = /home/circleci/.local/var/pmbootstrap/cache_git/pmaports
+            ccache_size = 5G
+            device = xiaomi-xun
+            jobs = 4
+            kernel = mainline
+            keymap = us
+            locale = en_US.UTF-8
+            mirror_alpine = http://dl-cdn.alpinelinux.org/alpine
+            mirror_pmOS = http://mirror.postmarketos.org/postmarketos
+            pmbootstrap_version = 3.11.1
+            timezone = UTC
+            user = user
+            work = /home/circleci/.local/var/pmbootstrap
+            CFG
+            sed -i 's/^            //' $HOME/.config/pmbootstrap_v3.cfg
+
+      - run:
+          name: Force config via CLI
+          command: |
+            sudo -E pmbootstrap --as-root config systemd none || true
+            sudo -E pmbootstrap --as-root config ui none
+            sudo -E pmbootstrap --as-root config device xiaomi-xun
+            sudo -E pmbootstrap --as-root config channel edge || true
+            echo "=== FINAL CONFIG ==="
+            sudo -E pmbootstrap --as-root config
+
+      - run:
+          name: Prepare ccache dir
+          command: |
+            sudo mkdir -p /root/.cache/ccache \
+              /home/circleci/.local/var/pmbootstrap/cache_ccache
+            sudo chmod -R 777 /root/.cache/ccache
+            sudo chmod -R 777 /home/circleci/.local/var/pmbootstrap/cache_ccache
+
+      - run:
+          name: Build kernel
+          command: |
+            sudo -E pmbootstrap --as-root build --force linux-postmarketos-qcom-sm6225
+          no_output_timeout: 60m
+
+      - run:
+          name: Build device package
+          command: |
+            sudo -E pmbootstrap --as-root build --force device-xiaomi-xun
+
+      - run:
+          name: Install
+          command: |
+            sudo -E pmbootstrap --as-root install --password=147147
+          no_output_timeout: 30m
+
+      - run:
+          name: Export
+          command: |
+            sudo -E pmbootstrap --as-root export
+
+      - save_cache:
+          key: ccache-sm6225-v1-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - /root/.cache/ccache
+            - /home/circleci/.local/var/pmbootstrap/cache_ccache
+
+      - run:
+          name: Check ccache state
+          when: always
+          command: |
+            sudo du -sh /home/circleci/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "WORK/cache_ccache: MISSING"
+            sudo du -sh /root/.cache/ccache 2>/dev/null || echo "/root/.cache/ccache: MISSING"
+
+      - run:
+          name: Verify export contents
+          when: always
+          command: |
+            echo "--- /tmp/postmarketOS-export ---"
+            sudo ls -la /tmp/postmarketOS-export/ || true
+            echo "--- DTB check ---"
+            sudo dtc -I dtb -O dts /tmp/postmarketOS-export/dtbs/qcom/sm6225-xiaomi-xun.dtb 2>/dev/null | grep -E "model|compatible|board-id" || true
+
+      - store_artifacts:
+          path: /tmp/postmarketOS-export
+          destination: pmos-xun-images
+
+workflows:
+  build-xun:
+    jobs:
+      - build
