@@ -59,7 +59,6 @@ jobs:
           mkdir -p $HOME/.config /root/.config
           echo "[pmbootstrap]" > $HOME/.config/pmbootstrap_v3.cfg
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
-
           sudo -E pmbootstrap --as-root config aports /home/runner/.local/var/pmbootstrap/cache_git/pmaports
           sudo -E pmbootstrap --as-root config ccache_size 5G
           sudo -E pmbootstrap --as-root config device xiaomi-xun
@@ -69,10 +68,8 @@ jobs:
           sudo -E pmbootstrap --as-root config channel edge
           sudo -E pmbootstrap --as-root config jobs 4
           sudo -E pmbootstrap --as-root config work /home/runner/.local/var/pmbootstrap
-
           sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg 2>/dev/null || true
-
           echo "=== FINAL CONFIG ==="
           sudo cat /root/.config/pmbootstrap_v3.cfg
 
@@ -95,8 +92,7 @@ jobs:
 
       - name: Check ccache state
         if: always()
-        run: |
-          sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
+        run: sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
 
       - name: Verify export contents
         if: always()

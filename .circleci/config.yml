@@ -54,26 +54,27 @@ jobs:
       - run:
           name: Write pmbootstrap config
           command: |
-            sudo rm -f /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg
+            mkdir -p $HOME/.config /root/.config
+            echo "[pmbootstrap]" > $HOME/.config/pmbootstrap_v3.cfg
+            sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
             sudo -E pmbootstrap --as-root config aports /home/circleci/.local/var/pmbootstrap/cache_git/pmaports
+            sudo -E pmbootstrap --as-root config ccache_size 5G
             sudo -E pmbootstrap --as-root config device xiaomi-xun
-            sudo -E pmbootstrap --as-root config systemd False
+            sudo -E pmbootstrap --as-root config systemd false
             sudo -E pmbootstrap --as-root config ui none
             sudo -E pmbootstrap --as-root config kernel mainline
             sudo -E pmbootstrap --as-root config channel edge
             sudo -E pmbootstrap --as-root config jobs 4
             sudo -E pmbootstrap --as-root config work /home/circleci/.local/var/pmbootstrap
-            sudo mkdir -p /root/.config $HOME/.config
             sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
+            sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg 2>/dev/null || true
             echo "=== FINAL CONFIG ==="
-            sudo -E pmbootstrap --as-root config
+            sudo cat /root/.config/pmbootstrap_v3.cfg
 
       - run:
           name: Prepare ccache dir
           command: |
-            sudo mkdir -p /root/.cache/ccache \
-              /home/circleci/.local/var/pmbootstrap/cache_ccache
-            sudo chmod -R 777 /root/.cache/ccache
+            sudo mkdir -p /home/circleci/.local/var/pmbootstrap/cache_ccache
             sudo chmod -R 777 /home/circleci/.local/var/pmbootstrap/cache_ccache
 
       - run:
@@ -101,7 +102,6 @@ jobs:
       - save_cache:
           key: ccache-sm6225-v1-{{ .Branch }}-{{ .Revision }}
           paths:
-            - /root/.cache/ccache
             - /home/circleci/.local/var/pmbootstrap/cache_ccache
 
       - run:
@@ -109,7 +109,6 @@ jobs:
           when: always
           command: |
             sudo du -sh /home/circleci/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
-            sudo du -sh /root/.cache/ccache 2>/dev/null || echo "MISSING"
 
       - run:
           name: Verify export contents
