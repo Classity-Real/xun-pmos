@@ -27,30 +27,43 @@ jobs:
       - name: Init pmbootstrap
         run: |
           expect <<'EOF'
-          set timeout 900
+          set timeout 30
+          log_user 1
           spawn pmbootstrap init
-          expect "Work path"                { send "\r" }
-          expect "pmaports path"            { send "\r" }
-          expect "Channel"                  { send "edge\r" }
-          expect "Vendor"                   { send "xiaomi\r" }
-          expect "Device codename"          { send "xun\r" }
-          expect "Create a new device port" { send "y\r" }
-          expect "Device architecture"      { send "\r" }
-          expect "User interface"           { send "none\r" }
-          expect "Kernel"                   { send "mainline\r" }
-          expect "Chassis"                  { send "tablet\r" }
-          expect "Flash method"             { send "fastboot\r" }
-          expect "Known working boot.img"   { send "\r" }
-          expect "Boot partition size"      { send "\r" }
-          expect "Extra packages"           { send "\r" }
-          expect "Default locale"           { send "\r" }
-          expect "Default timezone"         { send "\r" }
-          expect "Default username"         { send "\r" }
-          expect "Device hostname"          { send "\r" }
-          expect "Change them"              { send "n\r" }
-          expect "Copy these public keys"   { send "n\r" }
-          expect "Build outdated packages"  { send "y\r" }
-          expect "Zap existing"             { send "y\r" }
+
+          # Work path
+          expect -re {Work path\s*\[[^\]]*\]:\s*$} { send "\r" }
+
+          # pmaports path - may or may not appear, use a combined matcher
+          expect {
+            -re {pmaports path\s*\[[^\]]*\]:\s*$} { send "\r"; exp_continue }
+            -re {Channel\s*\[edge\]:\s*$}           { send "edge\r" }
+            timeout { puts "STUCK after pmaports path"; exit 1 }
+          }
+
+          expect -re {Vendor\s*\[[^\]]*\]:\s*$}            { send "xiaomi\r" }
+          expect -re {Device codename:\s*$}                { send "xun\r" }
+          expect {
+            -re {not found.*Add it now\?.*\[y\]:\s*$}      { send "y\r" }
+            -re {Create a new device port\?.*\[y\]:\s*$}   { send "y\r" }
+            timeout { puts "STUCK at create-device prompt"; exit 1 }
+          }
+          expect -re {architecture.*\[aarch64\]:\s*$}      { send "\r" }
+          expect -re {User interface:}                     { send "none\r" }
+          expect -re {Kernel.*\[mainline\]:\s*$}           { send "\r" }
+          expect -re {Chassis:\s*$}                        { send "tablet\r" }
+          expect -re {Flash method:\s*$}                   { send "fastboot\r" }
+          expect -re {Known working boot.img\?.*:\s*$}     { send "\r" }
+          expect -re {Boot partition size.*:\s*$}          { send "\r" }
+          expect -re {Extra packages.*:\s*$}               { send "\r" }
+          expect -re {Default locale.*:\s*$}               { send "\r" }
+          expect -re {Default timezone.*:\s*$}             { send "\r" }
+          expect -re {Default username.*:\s*$}             { send "\r" }
+          expect -re {Device hostname.*:\s*$}              { send "\r" }
+          expect -re {Change them\?.*\[n\]:\s*$}           { send "n\r" }
+          expect -re {Copy these public keys.*\[n\]:\s*$}  { send "n\r" }
+          expect -re {Build outdated packages.*\[y\]:\s*$} { send "y\r" }
+          expect -re {Zap existing.*\[y\]:\s*$}            { send "y\r" }
           expect eof
           EOF
 
@@ -63,7 +76,7 @@ jobs:
           cp -r device/kernel-package $PMA/device/archived/linux-postmarketos-qcom-sm6225
           cd $PMA
           git add -A
-          git -c user.email=ci@x -c user.name=ci commit -m "xun port"
+          git -c user.email=ci@x -c user.name=ci commit -m "xun port" || true
 
       - name: Build kernel
         run: pmbootstrap build --force linux-postmarketos-qcom-sm6225
