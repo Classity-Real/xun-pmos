@@ -8990,4 +8990,3 @@ CONFIG_MEMTEST=y
 #
 # end of Rust hacking
 # end of Kernel hacking
-CONFIG_TEXT_OFFSET=0x8000

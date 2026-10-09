@@ -1,7 +1,7 @@
 maintainer=""
 pkgname=linux-postmarketos-qcom-sm6225
 pkgver=6.1
-pkgrel=2
+pkgrel=3
 pkgdesc="Mainline Kernel fork for SM6225 devices"
 arch="aarch64"
 _carch="arm64"
@@ -32,27 +32,24 @@ builddir="$srcdir/$_repository-$_commit"
 prepare() {
         default_prepare
         cp "$srcdir/config-$_flavor.$arch" .config
-
-        # Copy DTS into kernel tree
         cp "$srcdir/sm6225-xiaomi-xun.dts" arch/arm64/boot/dts/qcom/
-
-        # Append Makefile entry with a REAL tab character (printf guarantees \t)
         printf 'dtb-$(CONFIG_ARCH_QCOM)\t+= sm6225-xiaomi-xun.dtb\n' \
                 >> arch/arm64/boot/dts/qcom/Makefile
+        # Force TEXT_OFFSET for Qualcomm bootloader (0x8000 = 32KB header offset)
+        sed -i 's/^TEXT_OFFSET := .*/TEXT_OFFSET := 0x8000/' arch/arm64/Makefile
+        grep -H "TEXT_OFFSET :=" arch/arm64/Makefile || true
 }
 
 build() {
         unset LDFLAGS
         make ARCH="$_carch" CC="${CC:-gcc}" \
                 KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-$_flavor" V=1
-        # Build all DTBs (will include ours since it's now in the Makefile)
         make ARCH="$_carch" CC="${CC:-gcc}" dtbs
 }
 
 package() {
         install -Dm644 "$builddir/arch/$_carch/boot/Image.gz" \
                 "$pkgdir/boot/vmlinuz"
-
         make modules_install dtbs_install \
                 ARCH="$_carch" \
                 INSTALL_PATH="$pkgdir"/boot/ \
@@ -60,13 +57,12 @@ package() {
                 INSTALL_MOD_STRIP=1 \
                 INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
         rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
-
         install -D "$builddir"/include/config/kernel.release \
                 "$pkgdir"/usr/share/kernel/$_flavor/kernel.release
 }
 
 sha512sums="
 df2584f29d4e2c753eed2f843da9c2134211c6359d0bd58d0d5f3ab3baf6cdebf57e37997da5a92a2401669329fcb30dd3c8c2c65c7be1eb86fe67abc9c2da91  linux-postmarketos-qcom-sm6225-849f3f471b6268280dc8418e0bddda435ae5d4a5.tar.gz
-5e442fb0bec2db6c03fad6513d24f8f4ed0a7a08147ffe205a2cebf549e13dbfd455135f220a0fd237353ffcb9619d8ec6ec3dc87b398c5709a70e8716178715  config-postmarketos-qcom-sm6225.aarch64
+5c2409f1f165b70f10450591274662630005280087102427ee4a3e6b22794747157bc3f474f16962d108203283f00b1c20e04b420d1bddbac49c11e3d0b13669  config-postmarketos-qcom-sm6225.aarch64
 709fb599996333e01bfb254887e83179d7c4a3974b3dd39ea50c3191755b85c9cfc3cffbb613b1152d5e10e4b01f659b0acc176e800f549329bf8649b67854ba  sm6225-xiaomi-xun.dts
 "
