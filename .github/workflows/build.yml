@@ -63,10 +63,10 @@ jobs:
           sudo -E pmbootstrap --as-root config aports /home/runner/.local/var/pmbootstrap/cache_git/pmaports
           sudo -E pmbootstrap --as-root config ccache_size 5G
           sudo -E pmbootstrap --as-root config device xiaomi-xun
-          sudo -E pmbootstrap --as-root config systemd false
+          sudo -E pmbootstrap --as-root config service_manager openrc
           sudo -E pmbootstrap --as-root config ui none
           sudo -E pmbootstrap --as-root config kernel mainline
-          sudo -E pmbootstrap --as-root config channel edge
+          sudo -E pmbootstrap --as-root config is_default_channel True
           sudo -E pmbootstrap --as-root config jobs 4
           sudo -E pmbootstrap --as-root config work /home/runner/.local/var/pmbootstrap
           sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
