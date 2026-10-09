@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
 
     steps:
@@ -16,7 +16,9 @@ jobs:
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: /root/.cache/ccache
+          path: |
+            /home/runner/.local/var/pmbootstrap/cache_ccache
+            /root/.cache/ccache
           key: ccache-sm6225-${{ github.sha }}
           restore-keys: |
             ccache-sm6225-
@@ -55,17 +57,14 @@ jobs:
           git add -A
           git -c user.email=ci@x -c user.name=ci commit -m "xun port"
 
-      - name: Write pmbootstrap config
+      - name: Write base pmbootstrap config
         run: |
           mkdir -p $HOME/.config
           cat > $HOME/.config/pmbootstrap_v3.cfg <<'CFG'
           [pmbootstrap]
           aports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports
           ccache_size = 5G
-          channel = edge
           device = xiaomi-xun
-          extra_packages =
-          is_default_channel = True
           jobs = 4
           kernel = mainline
           keymap = us
@@ -73,23 +72,27 @@ jobs:
           mirror_alpine = http://dl-cdn.alpinelinux.org/alpine
           mirror_pmOS = http://mirror.postmarketos.org/postmarketos
           pmbootstrap_version = 3.11.1
-          sudo_timer = False
-          systemd = none
           timezone = UTC
-          ui = none
           user = user
           work = /home/runner/.local/var/pmbootstrap
           CFG
-
           sed -i 's/^          //' $HOME/.config/pmbootstrap_v3.cfg
 
-          echo "--- config ---"
-          cat $HOME/.config/pmbootstrap_v3.cfg
+      - name: Force config via CLI
+        run: |
+          sudo -E pmbootstrap --as-root config systemd none || true
+          sudo -E pmbootstrap --as-root config ui none
+          sudo -E pmbootstrap --as-root config device xiaomi-xun
+          sudo -E pmbootstrap --as-root config channel edge || true
+          echo "=== FINAL CONFIG ==="
+          sudo -E pmbootstrap --as-root config
 
       - name: Prepare ccache dir
         run: |
-          sudo mkdir -p /root/.cache/ccache
-          sudo chmod 777 /root/.cache/ccache
+          sudo mkdir -p /root/.cache/ccache \
+            /home/runner/.local/var/pmbootstrap/cache_ccache
+          sudo chmod -R 777 /root/.cache/ccache
+          sudo chmod -R 777 /home/runner/.local/var/pmbootstrap/cache_ccache
 
       - name: Build kernel
         run: sudo -E pmbootstrap --as-root build --force linux-postmarketos-qcom-sm6225
@@ -103,12 +106,16 @@ jobs:
       - name: Export
         run: sudo -E pmbootstrap --as-root export
 
+      - name: Check ccache state
+        if: always()
+        run: |
+          sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "WORK/cache_ccache: MISSING"
+          sudo du -sh /root/.cache/ccache 2>/dev/null || echo "/root/.cache/ccache: MISSING"
+
       - name: Verify export contents
         if: always()
         run: |
-          echo "--- /tmp/postmarketOS-export contents ---"
           sudo ls -la /tmp/postmarketOS-export/ || true
-          echo "--- DTB check ---"
           sudo dtc -I dtb -O dts /tmp/postmarketOS-export/dtbs/qcom/sm6225-xiaomi-xun.dtb 2>/dev/null | grep -E "model|compatible|board-id" || true
 
       - name: Fix artifact permissions
