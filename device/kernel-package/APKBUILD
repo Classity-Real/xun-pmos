@@ -32,30 +32,35 @@ builddir="$srcdir/$_repository-$_commit"
 prepare() {
         default_prepare
         cp "$srcdir/config-$_flavor.$arch" .config
-        cp "$srcdir/sm6225-xiaomi-xun.dts" \
-                "$builddir"/arch/arm64/boot/dts/qcom/
+
+        # Copy DTS into kernel tree
+        cp "$srcdir/sm6225-xiaomi-xun.dts" arch/arm64/boot/dts/qcom/
+
+        # Append Makefile entry with a REAL tab character (printf guarantees \t)
+        printf 'dtb-$(CONFIG_ARCH_QCOM)\t+= sm6225-xiaomi-xun.dtb\n' \
+                >> arch/arm64/boot/dts/qcom/Makefile
 }
 
 build() {
         unset LDFLAGS
         make ARCH="$_carch" CC="${CC:-gcc}" \
                 KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-$_flavor" V=1
-        # Build our DTB explicitly
-        make ARCH="$_carch" CC="${CC:-gcc}" qcom/sm6225-xiaomi-xun.dtb
+        # Build all DTBs (will include ours since it's now in the Makefile)
+        make ARCH="$_carch" CC="${CC:-gcc}" dtbs
 }
 
 package() {
         install -Dm644 "$builddir/arch/$_carch/boot/Image.gz" \
                 "$pkgdir/boot/vmlinuz"
-        # Install our DTB explicitly
-        install -Dm644 \
-                "$builddir/arch/$_carch/boot/dts/qcom/sm6225-xiaomi-xun.dtb" \
-                "$pkgdir/boot/dtbs/qcom/sm6225-xiaomi-xun.dtb"
-        make modules_install \
+
+        make modules_install dtbs_install \
                 ARCH="$_carch" \
+                INSTALL_PATH="$pkgdir"/boot/ \
                 INSTALL_MOD_PATH="$pkgdir" \
-                INSTALL_MOD_STRIP=1
+                INSTALL_MOD_STRIP=1 \
+                INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
         rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
+
         install -D "$builddir"/include/config/kernel.release \
                 "$pkgdir"/usr/share/kernel/$_flavor/kernel.release
 }
