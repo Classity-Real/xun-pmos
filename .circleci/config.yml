@@ -55,23 +55,23 @@ jobs:
           name: Write pmbootstrap config
           command: |
             mkdir -p $HOME/.config
-            cat > $HOME/.config/pmbootstrap_v3.cfg <<'CFG'
-            [pmbootstrap]
-            aports = /home/circleci/.local/var/pmbootstrap/cache_git/pmaports
-            ccache_size = 5G
-            device = xiaomi-xun
-            jobs = 4
-            kernel = mainline
-            keymap = us
-            locale = en_US.UTF-8
-            mirror_alpine = http://dl-cdn.alpinelinux.org/alpine
-            mirror_pmOS = http://mirror.postmarketos.org/postmarketos
-            pmbootstrap_version = 3.11.1
-            timezone = UTC
-            user = user
-            work = /home/circleci/.local/var/pmbootstrap
-            CFG
-            sed -i 's/^            //' $HOME/.config/pmbootstrap_v3.cfg
+            printf '%s\n' \
+              '[pmbootstrap]' \
+              'aports = /home/circleci/.local/var/pmbootstrap/cache_git/pmaports' \
+              'ccache_size = 5G' \
+              'device = xiaomi-xun' \
+              'jobs = 4' \
+              'kernel = mainline' \
+              'keymap = us' \
+              'locale = en_US.UTF-8' \
+              'mirror_alpine = http://dl-cdn.alpinelinux.org/alpine' \
+              'mirror_pmOS = http://mirror.postmarketos.org/postmarketos' \
+              'pmbootstrap_version = 3.11.1' \
+              'timezone = UTC' \
+              'user = user' \
+              'work = /home/circleci/.local/var/pmbootstrap' \
+              > $HOME/.config/pmbootstrap_v3.cfg
+            cat $HOME/.config/pmbootstrap_v3.cfg
 
       - run:
           name: Force config via CLI
