@@ -34,9 +34,26 @@ jobs:
           git clone --depth=1 https://gitlab.postmarketos.org/postMarketOS/pmbootstrap.git $HOME/pmbootstrap
           sudo ln -sf $HOME/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
+      - name: Clone pmaports explicitly
+        run: |
+          WORK=$HOME/.local/var/pmbootstrap
+          mkdir -p $WORK/cache_git
+          git clone --depth=1 \
+            https://gitlab.postmarketos.org/postMarketOS/pmaports.git \
+            $WORK/cache_git/pmaports
+          echo "--- pmaports cloned ---"
+          ls $WORK/cache_git/pmaports/ | head
+
       - name: Bootstrap pmbootstrap config
         run: |
-          pmbootstrap -y init --device qemu-amd64 --ui none --kernel mainline || true
+          rm -f $HOME/.config/pmbootstrap_v3.cfg
+          pmbootstrap -y init \
+            --work $HOME/.local/var/pmbootstrap \
+            --device qemu-amd64 \
+            --ui none \
+            --kernel mainline
+          echo "--- config written ---"
+          cat $HOME/.config/pmbootstrap_v3.cfg
 
       - name: Install xun device + kernel packages
         run: |
@@ -47,7 +64,7 @@ jobs:
           cp -r device/kernel-package $PMA/device/archived/linux-postmarketos-qcom-sm6225
           cd $PMA
           git add -A
-          git -c user.email=ci@x -c user.name=ci commit -m "xun port" || true
+          git -c user.email=ci@x -c user.name=ci commit -m "xun port"
 
       - name: Switch to xun device
         run: |
@@ -71,6 +88,14 @@ jobs:
 
       - name: Export
         run: sudo -E pmbootstrap export
+
+      - name: Verify export contents
+        if: always()
+        run: |
+          echo "--- /tmp/postmarketOS-export contents ---"
+          sudo ls -la /tmp/postmarketOS-export/ || true
+          echo "--- DTB check ---"
+          sudo dtc -I dtb -O dts /tmp/postmarketOS-export/dtbs/qcom/sm6225-xiaomi-xun.dtb 2>/dev/null | grep -E "model|compatible|board-id" || true
 
       - name: Fix artifact permissions
         if: always()
