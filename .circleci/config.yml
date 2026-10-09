@@ -57,6 +57,7 @@ jobs:
             mkdir -p $HOME/.config
             printf '%s\n' \
               '[pmbootstrap]' \
+              'channel = edge' \
               'aports = /home/circleci/.local/var/pmbootstrap/cache_git/pmaports' \
               'ccache_size = 5G' \
               'device = xiaomi-xun' \
@@ -66,7 +67,6 @@ jobs:
               'locale = en_US.UTF-8' \
               'mirror_alpine = http://dl-cdn.alpinelinux.org/alpine' \
               'mirror_pmOS = http://mirror.postmarketos.org/postmarketos' \
-              'pmbootstrap_version = 3.11.1' \
               'systemd = False' \
               'timezone = UTC' \
               'ui = none' \
@@ -135,4 +135,8 @@ jobs:
 workflows:
   build-xun:
     jobs:
-      - build
+      - build:
+          filters:
+            branches:
+              only:
+                - ci-trigger
