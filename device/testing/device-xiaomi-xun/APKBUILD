@@ -9,7 +9,7 @@ arch="aarch64"
 license="MIT"
 depends="
         linux-postmarketos-qcom-sm6225
-        mkbootimg
+        mkbootimg-osm0sis
         postmarketos-base
         "
 makedepends="devicepkg-dev"
@@ -28,6 +28,6 @@ package() {
 }
 
 sha512sums="
-22ed07a4febddb5ecd0b9862ec0e0fe6bdee2c729961a3512580e3ddb87e9b24987dc73500e906ffd5847b8c9854d6df524b6aed73ef105ac1771b8320de4b73  deviceinfo
+c73cf84679ca34eedfcb07bdeec74eb89c7b535522a77e150199665ba03d5599a4967461fa38d3e5679aea549a2b232a3d1435e4d95e7918bb68a57bcfb47f7c  deviceinfo
 e70bae17df23dcaaaea0e2d3616556f04baa23f8ee1357785c0f539bf97282d8ddff53953e155b72689bb73beb38c2da3d08de2a61e866684edfa10a6593885d  modules-initfs
 "
