@@ -16,9 +16,7 @@ jobs:
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: |
-            /home/runner/.local/var/pmbootstrap/cache_ccache
-            /root/.cache/ccache
+          path: /home/runner/.local/var/pmbootstrap/cache_ccache
           key: ccache-sm6225-${{ github.sha }}
           restore-keys: |
             ccache-sm6225-
@@ -58,25 +56,29 @@ jobs:
 
       - name: Write pmbootstrap config
         run: |
-          sudo rm -f /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg
+          mkdir -p $HOME/.config /root/.config
+          echo "[pmbootstrap]" > $HOME/.config/pmbootstrap_v3.cfg
+          sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
+
           sudo -E pmbootstrap --as-root config aports /home/runner/.local/var/pmbootstrap/cache_git/pmaports
+          sudo -E pmbootstrap --as-root config ccache_size 5G
           sudo -E pmbootstrap --as-root config device xiaomi-xun
-          sudo -E pmbootstrap --as-root config systemd False
+          sudo -E pmbootstrap --as-root config systemd false
           sudo -E pmbootstrap --as-root config ui none
           sudo -E pmbootstrap --as-root config kernel mainline
           sudo -E pmbootstrap --as-root config channel edge
           sudo -E pmbootstrap --as-root config jobs 4
           sudo -E pmbootstrap --as-root config work /home/runner/.local/var/pmbootstrap
-          sudo mkdir -p /root/.config $HOME/.config
+
           sudo cp /root/.config/pmbootstrap_v3.cfg $HOME/.config/pmbootstrap_v3.cfg 2>/dev/null || true
+          sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg 2>/dev/null || true
+
           echo "=== FINAL CONFIG ==="
-          sudo -E pmbootstrap --as-root config
+          sudo cat /root/.config/pmbootstrap_v3.cfg
 
       - name: Prepare ccache dir
         run: |
-          sudo mkdir -p /root/.cache/ccache \
-            /home/runner/.local/var/pmbootstrap/cache_ccache
-          sudo chmod -R 777 /root/.cache/ccache
+          sudo mkdir -p /home/runner/.local/var/pmbootstrap/cache_ccache
           sudo chmod -R 777 /home/runner/.local/var/pmbootstrap/cache_ccache
 
       - name: Build kernel
@@ -95,7 +97,6 @@ jobs:
         if: always()
         run: |
           sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
-          sudo du -sh /root/.cache/ccache 2>/dev/null || echo "MISSING"
 
       - name: Verify export contents
         if: always()
