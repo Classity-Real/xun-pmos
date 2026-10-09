@@ -67,21 +67,14 @@ jobs:
               'mirror_alpine = http://dl-cdn.alpinelinux.org/alpine' \
               'mirror_pmOS = http://mirror.postmarketos.org/postmarketos' \
               'pmbootstrap_version = 3.11.1' \
+              'systemd = False' \
               'timezone = UTC' \
+              'ui = none' \
               'user = user' \
               'work = /home/circleci/.local/var/pmbootstrap' \
               > $HOME/.config/pmbootstrap_v3.cfg
+            echo "--- config written ---"
             cat $HOME/.config/pmbootstrap_v3.cfg
-
-      - run:
-          name: Force config via CLI
-          command: |
-            sudo -E pmbootstrap --as-root config systemd none || true
-            sudo -E pmbootstrap --as-root config ui none
-            sudo -E pmbootstrap --as-root config device xiaomi-xun
-            sudo -E pmbootstrap --as-root config channel edge || true
-            echo "=== FINAL CONFIG ==="
-            sudo -E pmbootstrap --as-root config
 
       - run:
           name: Prepare ccache dir
