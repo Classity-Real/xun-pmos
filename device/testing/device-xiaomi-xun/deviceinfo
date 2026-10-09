@@ -4,7 +4,7 @@ deviceinfo_name="Xiaomi Pad SE"
 deviceinfo_manufacturer="Xiaomi"
 deviceinfo_codename="xiaomi-xun"
 deviceinfo_year="2023"
-deviceinfo_dtb="qcom/sm6225-lenovo-tb128fu"
+deviceinfo_dtb="qcom/sm6225-xiaomi-xun"
 deviceinfo_append_dtb="true"
 deviceinfo_arch="aarch64"
 
