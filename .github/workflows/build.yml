@@ -63,7 +63,7 @@ jobs:
           ccache_size = 5G
           channel = edge
           device = xiaomi-xun
-          extra_packages = 
+          extra_packages =
           is_default_channel = True
           jobs = 4
           kernel = mainline
@@ -80,7 +80,6 @@ jobs:
           work = /home/runner/.local/var/pmbootstrap
           CFG
 
-          # Strip leading whitespace from heredoc
           sed -i 's/^          //' $HOME/.config/pmbootstrap_v3.cfg
 
           echo "--- config ---"
@@ -92,16 +91,16 @@ jobs:
           sudo chmod 777 /root/.cache/ccache
 
       - name: Build kernel
-        run: sudo -E pmbootstrap build --force linux-postmarketos-qcom-sm6225
+        run: sudo -E pmbootstrap --as-root build --force linux-postmarketos-qcom-sm6225
 
       - name: Build device package
-        run: sudo -E pmbootstrap build --force device-xiaomi-xun
+        run: sudo -E pmbootstrap --as-root build --force device-xiaomi-xun
 
       - name: Install
-        run: sudo -E pmbootstrap install --password=147147
+        run: sudo -E pmbootstrap --as-root install --password=147147
 
       - name: Export
-        run: sudo -E pmbootstrap export
+        run: sudo -E pmbootstrap --as-root export
 
       - name: Verify export contents
         if: always()
