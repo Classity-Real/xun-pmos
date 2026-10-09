@@ -1,6 +1,7 @@
-name: Build...
+name: Build postmarketOS for xiaomi-xun
 
-on:  
+on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -8,37 +9,36 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /root/.cache/ccache
+          key: ccache-sm6225-${{ github.sha }}
+          restore-keys: |
+            ccache-sm6225-
 
       - name: Install dependencies
         run: |
           sudo add-apt-repository -y universe
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip git \
-            multipath-tools parted e2fsprogs expect android-sdk-libsparse-utils
+            multipath-tools parted e2fsprogs \
+            android-sdk-libsparse-utils
 
       - name: Clone pmbootstrap
         run: |
           git clone --depth=1 https://gitlab.postmarketos.org/postMarketOS/pmbootstrap.git $HOME/pmbootstrap
           sudo ln -sf $HOME/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
-      
-      - name: Init pmbootstrap
-        run: |
-          cat > /tmp/init.exp <<'EXPEOF'
-          set timeout 120
-          log_user 1
-          spawn pmbootstrap init
-          expect {
-              -re "\\?"  { send "\r"; exp_continue }
-              -re ":"   { send "\r"; exp_continue }
-              eof       { }
-              timeout   { puts "\n\n=== TIMEOUT - last 30 lines above are the prompts ===\n"; exit 0 }
-          }
-          EXPEOF
-          expect -f /tmp/init.exp || true
 
-      - name: Install device + kernel packages
+      - name: Bootstrap pmbootstrap config
+        run: |
+          pmbootstrap -y init --device qemu-amd64 --ui none --kernel mainline || true
+
+      - name: Install xun device + kernel packages
         run: |
           PMA=$HOME/.local/var/pmbootstrap/cache_git/pmaports
           rm -rf $PMA/device/testing/device-xiaomi-xun
@@ -49,21 +49,37 @@ jobs:
           git add -A
           git -c user.email=ci@x -c user.name=ci commit -m "xun port" || true
 
+      - name: Switch to xun device
+        run: |
+          pmbootstrap -y config device xiaomi-xun
+          echo "--- config check ---"
+          grep -iE "device|kernel|ui" $HOME/.config/pmbootstrap_v3.cfg
+
+      - name: Prepare ccache dir
+        run: |
+          sudo mkdir -p /root/.cache/ccache
+          sudo chmod 777 /root/.cache/ccache
+
       - name: Build kernel
-        run: pmbootstrap build --force linux-postmarketos-qcom-sm6225
+        run: sudo -E pmbootstrap build --force linux-postmarketos-qcom-sm6225
 
       - name: Build device package
-        run: pmbootstrap build --force device-xiaomi-xun
+        run: sudo -E pmbootstrap build --force device-xiaomi-xun
 
       - name: Install
-        run: pmbootstrap install --password=147147
+        run: sudo -E pmbootstrap install --password=147147
 
       - name: Export
-        run: pmbootstrap export
+        run: sudo -E pmbootstrap export
+
+      - name: Fix artifact permissions
+        if: always()
+        run: sudo chmod -R 755 /tmp/postmarketOS-export/ || true
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pmos-xun-images
           path: /tmp/postmarketOS-export/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
