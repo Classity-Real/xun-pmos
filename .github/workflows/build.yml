@@ -41,6 +41,7 @@ jobs:
           git clone --depth=1 \
             https://gitlab.postmarketos.org/postMarketOS/pmaports.git \
             $WORK/cache_git/pmaports
+          echo 8 > $WORK/version
           ls $WORK/cache_git/pmaports/ | head
 
       - name: Install xun packages into pmaports
