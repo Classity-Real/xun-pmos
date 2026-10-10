@@ -16,7 +16,7 @@ jobs:
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: /home/runner/.local/var/pmbootstrap/cache_ccache
+          path: /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
           key: ccache-sm6225-${{ github.sha }}
           restore-keys: |
             ccache-sm6225-
@@ -80,8 +80,8 @@ jobs:
 
       - name: Prepare ccache dir
         run: |
-          sudo mkdir -p /home/runner/.local/var/pmbootstrap/cache_ccache
-          sudo chmod -R 777 /home/runner/.local/var/pmbootstrap/cache_ccache
+          sudo mkdir -p /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
+          sudo chmod -R 777 /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
 
       - name: Build kernel
         run: sudo -E pmbootstrap --as-root build --force linux-postmarketos-qcom-sm6225
