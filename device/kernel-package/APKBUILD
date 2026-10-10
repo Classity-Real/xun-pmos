@@ -26,6 +26,7 @@ source="
         $pkgname-$_commit.tar.gz::https://gitlab.com/TQMatvey/$_repository/-/archive/$_commit.tar.gz
         $_config
         sm6225-xiaomi-xun.dts
+        sm6225-dtsi-bundle.tar.gz
 "
 builddir="$srcdir/$_repository-$_commit"
 
