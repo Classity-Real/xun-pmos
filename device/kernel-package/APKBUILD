@@ -1,7 +1,7 @@
 maintainer="Classity-Real <uiportsarchives@gmail.com>"
 pkgname=linux-postmarketos-qcom-sm6225
 pkgver=6.1
-pkgrel=6
+pkgrel=7
 pkgdesc="Mainline Kernel fork for SM6225 devices"
 arch="aarch64"
 _carch="arm64"
@@ -37,9 +37,11 @@ prepare() {
         printf 'dtb-$(CONFIG_ARCH_QCOM)\t+= sm6225-xiaomi-xun.dtb\n'                 >> arch/arm64/boot/dts/qcom/Makefile
 
         # Extract and install full mainline sm6115.dtsi as sm6225.dtsi
-        tar xzf "$srcdir/sm6225-dtsi-bundle.tar.gz" -C /tmp/
-        cp /tmp/sm6225.dtsi arch/arm64/boot/dts/qcom/sm6225.dtsi
-        cp -rn /tmp/dt-bindings/* include/dt-bindings/
+        rm -rf /tmp/dtsi-extract
+        mkdir -p /tmp/dtsi-extract
+        tar xzf "$srcdir/sm6225-dtsi-bundle.tar.gz" -C /tmp/dtsi-extract --no-same-owner --no-same-permissions
+        cp /tmp/dtsi-extract/sm6225.dtsi /tmp/sm6225.dtsi 2>/dev/null || cp /tmp/dtsi-extract/./sm6225.dtsi /tmp/sm6225.dtsi
+        cp -rn /tmp/dtsi-extract/dt-bindings/* include/dt-bindings/
         echo "=== sm6225.dtsi line count after replace: ==="
         wc -l arch/arm64/boot/dts/qcom/sm6225.dtsi
         # Force kernel to ignore bootloader DTB pointer (x0) and use appended DTB
