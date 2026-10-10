@@ -34,6 +34,10 @@ prepare() {
         cp "$srcdir/config-$_flavor.$arch" .config
         cp "$srcdir/sm6225-xiaomi-xun.dts" arch/arm64/boot/dts/qcom/
         printf 'dtb-$(CONFIG_ARCH_QCOM)\t+= sm6225-xiaomi-xun.dtb\n'                 >> arch/arm64/boot/dts/qcom/Makefile
+        # Force kernel to ignore bootloader DTB pointer (x0) and use appended DTB
+        sed -i '/mov.*x21, x0.*FDT/s/x0/xzr/' arch/arm64/kernel/head.S
+        echo "=== head.S line 116 after patch: ==="
+        sed -n '116p' arch/arm64/kernel/head.S
 }
 
 build() {
