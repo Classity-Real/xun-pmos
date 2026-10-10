@@ -94,15 +94,13 @@ jobs:
 
       - name: Export
         run: sudo -E pmbootstrap --as-root export
-
       - name: Patch boot.img os_version
         run: |
           echo "--- before ---"
           sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
-echo '99010020' | xxd -r -p | sudo dd of=/tmp/postmarketOS-export/boot.img bs=1 seek=16 count=4 conv=notrunc
+          echo 99010020 | xxd -r -p | sudo dd of=/tmp/postmarketOS-export/boot.img bs=1 seek=16 count=4 conv=notrunc
           echo "--- after ---"
           sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
-
       - name: Check ccache state
         if: always()
         run: sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
