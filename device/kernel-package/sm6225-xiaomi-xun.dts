@@ -52,4 +52,8 @@
                         status = "okay";
                 };
         };
+
+&reserved_memory {
+        /delete-node/ memory@5c000000;
+};
 };
