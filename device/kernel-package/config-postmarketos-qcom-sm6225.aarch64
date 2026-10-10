@@ -8990,3 +8990,12 @@ CONFIG_MEMTEST=y
 #
 # end of Rust hacking
 # end of Kernel hacking
+
+# --- Uncompressed kernel (matches Qualcomm bootloader expectations) ---
+# CONFIG_KERNEL_GZIP is not set
+# CONFIG_KERNEL_XZ is not set
+# CONFIG_KERNEL_LZ4 is not set
+# CONFIG_KERNEL_LZO is not set
+# CONFIG_KERNEL_LZMA is not set
+# CONFIG_KERNEL_ZSTD is not set
+CONFIG_KERNEL_UNCOMPRESSED=y
