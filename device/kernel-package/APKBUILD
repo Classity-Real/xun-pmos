@@ -1,7 +1,7 @@
 maintainer="Classity-Real <uiportsarchives@gmail.com>"
 pkgname=linux-postmarketos-qcom-sm6225
 pkgver=6.1
-pkgrel=3
+pkgrel=4
 pkgdesc="Mainline Kernel fork for SM6225 devices"
 arch="aarch64"
 _carch="arm64"
