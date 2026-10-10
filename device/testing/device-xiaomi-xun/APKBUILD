@@ -8,8 +8,8 @@ url="https://postmarketos.org"
 arch="aarch64"
 license="MIT"
 depends="
+        android-tools
         linux-postmarketos-qcom-sm6225
-        mkbootimg-osm0sis
         postmarketos-base
         "
 makedepends="devicepkg-dev"
@@ -28,6 +28,6 @@ package() {
 }
 
 sha512sums="
-c73cf84679ca34eedfcb07bdeec74eb89c7b535522a77e150199665ba03d5599a4967461fa38d3e5679aea549a2b232a3d1435e4d95e7918bb68a57bcfb47f7c  deviceinfo
-e70bae17df23dcaaaea0e2d3616556f04baa23f8ee1357785c0f539bf97282d8ddff53953e155b72689bb73beb38c2da3d08de2a61e866684edfa10a6593885d  modules-initfs
+$DINFO_HASH  deviceinfo
+$MOD_HASH  modules-initfs
 "
