@@ -52,8 +52,4 @@
                         status = "okay";
                 };
         };
-
-&cont_splash_mem {
-        /delete-property/ no-map;
-};
 };
