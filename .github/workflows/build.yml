@@ -99,7 +99,7 @@ jobs:
         run: |
           echo "--- before ---"
           sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
-          printf '\x99\x01\x00\x20' | sudo dd of=/tmp/postmarketOS-export/boot.img bs=1 seek=16 count=4 conv=notrunc
+echo '99010020' | xxd -r -p | sudo dd of=/tmp/postmarketOS-export/boot.img bs=1 seek=16 count=4 conv=notrunc
           echo "--- after ---"
           sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
 
