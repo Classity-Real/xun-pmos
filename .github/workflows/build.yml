@@ -114,8 +114,12 @@ jobs:
       - name: Dump pmbootstrap log
         if: always()
         run: |
-          echo "=========== log.txt tail (200) ==========="
-          sudo tail -n 200 /home/runner/.local/var/pmbootstrap/log.txt 2>/dev/null || echo "log.txt not found"
+          echo "=========== ALL LINES WITH ERROR ==========="
+          sudo grep -niE "error|failed|undefined|no rule|dtc" \
+            /home/runner/.local/var/pmbootstrap/log.txt | tail -80 || true
+          echo ""
+          echo "=========== last 100 lines ==========="
+          sudo tail -n 100 /home/runner/.local/var/pmbootstrap/log.txt || true
           echo ""
           echo "=========== export dir ==========="
           sudo ls -la /tmp/postmarketOS-export/ 2>/dev/null || echo "empty"
