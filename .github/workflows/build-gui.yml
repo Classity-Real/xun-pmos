@@ -1,0 +1,143 @@
+name: Build postmarketOS GUI (manual)
+
+# Manual only — does not run on push/ci-trigger.
+# Builds with Weston + display/touch driver stack so a GUI can be used.
+on:
+  workflow_dispatch:
+    inputs:
+      ui:
+        description: "UI to install"
+        required: true
+        default: "weston"
+        type: choice
+        options:
+          - weston
+          - console
+          - phosh
+
+jobs:
+  build-gui:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
+          key: ccache-sm6225-gui-${{ github.sha }}
+          restore-keys: |
+            ccache-sm6225-gui-
+            ccache-sm6225-
+
+      - name: Install dependencies
+        run: |
+          sudo add-apt-repository -y universe
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip git \
+            multipath-tools parted e2fsprogs \
+            android-sdk-libsparse-utils device-tree-compiler
+
+      - name: Clone pmbootstrap
+        run: |
+          git clone --depth=1 https://gitlab.postmarketos.org/postMarketOS/pmbootstrap.git $HOME/pmbootstrap
+          sudo ln -sf $HOME/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
+
+      - name: Clone pmaports
+        run: |
+          WORK=$HOME/.local/var/pmbootstrap
+          mkdir -p $WORK/cache_git
+          git clone --depth=1 \
+            https://gitlab.postmarketos.org/postMarketOS/pmaports.git \
+            $WORK/cache_git/pmaports
+          echo 8 > $WORK/version
+
+      - name: Install xun packages into pmaports
+        run: |
+          PMA=$HOME/.local/var/pmbootstrap/cache_git/pmaports
+          rm -rf $PMA/device/testing/device-xiaomi-xun
+          cp -r device/testing/device-xiaomi-xun $PMA/device/testing/
+          rm -rf $PMA/device/archived/linux-postmarketos-qcom-sm6225
+          cp -r device/kernel-package $PMA/device/archived/linux-postmarketos-qcom-sm6225
+          cd $PMA
+          git add -A
+          git -c user.email=ci@x -c user.name=ci commit -m "xun port gui"
+
+      - name: Write pmbootstrap config (GUI)
+        run: |
+          UI="${{ github.event.inputs.ui }}"
+          mkdir -p $HOME/.config
+          sudo mkdir -p /root/.config
+          printf '%s\n' \
+            '[pmbootstrap]' \
+            'aports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports' \
+            'build_default_device_arch = False' \
+            'ccache_size = 5G' \
+            'device = xiaomi-xun' \
+            'is_default_channel = True' \
+            'jobs = 4' \
+            'kernel = mainline' \
+            'service_manager = openrc' \
+            "ui = ${UI}" \
+            'work = /home/runner/.local/var/pmbootstrap' \
+            > $HOME/.config/pmbootstrap_v3.cfg
+          sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
+          echo "=== GUI build config (ui=${UI}) ==="
+          cat $HOME/.config/pmbootstrap_v3.cfg
+
+      - name: Prepare ccache dir
+        run: |
+          sudo mkdir -p /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
+          sudo chmod -R 777 /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
+
+      - name: Build kernel
+        run: sudo -E pmbootstrap --as-root build --force linux-postmarketos-qcom-sm6225
+
+      - name: Build device package
+        run: sudo -E pmbootstrap --as-root build --force device-xiaomi-xun
+
+      - name: Install (with GUI)
+        run: sudo -E pmbootstrap --as-root install --password=147147
+
+      - name: Export
+        run: sudo -E pmbootstrap --as-root export
+
+      - name: Patch boot.img + create recovery.img
+        run: |
+          echo "--- boot.img before ---"
+          sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
+          echo 99010020 | xxd -r -p | sudo dd of=/tmp/postmarketOS-export/boot.img bs=1 seek=16 count=4 conv=notrunc
+          echo "--- boot.img after ---"
+          sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
+          # recovery.img is essential — same image as boot for this device
+          sudo cp -a /tmp/postmarketOS-export/boot.img /tmp/postmarketOS-export/recovery.img
+          ls -la /tmp/postmarketOS-export/
+
+      - name: Verify DTB size
+        if: always()
+        run: |
+          echo "=== export tree ==="
+          sudo find /tmp/postmarketOS-export -type f -o -type l | sort
+          echo "=== dtb ==="
+          sudo find /tmp/postmarketOS-export -name '*.dtb' -exec ls -la {} \;
+
+      - name: Dump log on failure
+        if: failure()
+        run: |
+          sudo grep -nE "error:|Error 1|>>> ERROR|No rule|FATAL" \
+            /home/runner/.local/var/pmbootstrap/log.txt | tail -40 || true
+          sudo tail -n 60 /home/runner/.local/var/pmbootstrap/log.txt || true
+
+      - name: Fix artifact permissions
+        if: always()
+        run: sudo chmod -R 755 /tmp/postmarketOS-export/ || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pmos-xun-gui-${{ github.event.inputs.ui }}
+          path: /tmp/postmarketOS-export/
+          if-no-files-found: warn
+          retention-days: 14

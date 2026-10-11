@@ -18,3 +18,7 @@ deviceinfo_bootimg_qcdt="false"
 deviceinfo_flash_pagesize="4096"
 deviceinfo_header_version="4"
 deviceinfo_kernel_cmdline=""
+
+# recovery partition: use the same boot.img (kernel+initramfs+dtb).
+# CI exports recovery.img as a copy of the patched boot.img for
+# fastboot flash recovery / recovery_a.
