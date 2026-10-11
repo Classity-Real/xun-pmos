@@ -1,7 +1,7 @@
 maintainer="Classity-Real <uiportsarchives@gmail.com>"
 pkgname=linux-postmarketos-qcom-sm6225
 pkgver=6.1
-pkgrel=9
+pkgrel=10
 pkgdesc="Mainline Kernel fork for SM6225 devices"
 arch="aarch64"
 _carch="arm64"
@@ -53,16 +53,26 @@ prepare() {
 
 	cp "$EXTRACTED" arch/arm64/boot/dts/qcom/sm6225.dtsi
 
+	# Install dt-bindings into both places DTC looks at on 6.1
 	if [ -d /tmp/dtsi-extract/dt-bindings ]; then
-		cp -rn /tmp/dtsi-extract/dt-bindings/* include/dt-bindings/
+		mkdir -p include/dt-bindings
+		cp -rf /tmp/dtsi-extract/dt-bindings/* include/dt-bindings/
+		if [ -d scripts/dtc/include-prefixes ]; then
+			mkdir -p scripts/dtc/include-prefixes/dt-bindings
+			cp -rf /tmp/dtsi-extract/dt-bindings/* scripts/dtc/include-prefixes/dt-bindings/
+		fi
 	fi
 
 	echo "=== sm6225.dtsi line count after replace (expect ~3453) ==="
 	wc -l arch/arm64/boot/dts/qcom/sm6225.dtsi
 	echo "=== first 5 includes of sm6225.dtsi ==="
 	grep '#include' arch/arm64/boot/dts/qcom/sm6225.dtsi | head -5
-	echo "=== dt-bindings clock headers present? ==="
-	ls -la include/dt-bindings/clock/qcom,gcc-sm6115.h include/dt-bindings/clock/qcom,sm6115-dispcc.h 2>&1 || true
+	echo "=== critical clock headers ==="
+	ls -la \
+		include/dt-bindings/clock/qcom,gcc-sm6115.h \
+		include/dt-bindings/clock/qcom,sm6115-dispcc.h \
+		include/dt-bindings/clock/qcom,sm6115-gpucc.h \
+		2>&1 || true
 
 	# Force kernel to use its own appended DTB (ignore bootloader FDT)
 	sed -i '/mov.*x21, x0.*FDT/s/x0/xzr/' arch/arm64/kernel/head.S
@@ -75,10 +85,12 @@ build() {
 	export KBUILD_BUILD_TIMESTAMP="Mon Jan 1 00:00:00 UTC 2024"
 	export KBUILD_BUILD_USER=builder
 	export KBUILD_BUILD_HOST=ci
-	# No V=1 — verbose mode buries real errors under thousands of -Werror= flag lines
 	make ARCH="$_carch" CC="ccache ${CC:-gcc}" \
 		KBUILD_BUILD_VERSION="1"
-	make ARCH="$_carch" CC="ccache ${CC:-gcc}" dtbs
+	# Only build our board DTB — other fork boards include the new dtsi
+	# and fail if any header is still missing
+	make ARCH="$_carch" CC="ccache ${CC:-gcc}" \
+		arch/arm64/boot/dts/qcom/sm6225-xiaomi-xun.dtb
 	echo "=== dtb size (expect ~50k if bundle took effect) ==="
 	ls -la arch/arm64/boot/dts/qcom/sm6225-xiaomi-xun.dtb || true
 	ccache -s || true
@@ -87,12 +99,13 @@ build() {
 package() {
 	install -Dm644 "$builddir/arch/$_carch/boot/Image" \
 		"$pkgdir/boot/vmlinuz"
-	make modules_install dtbs_install \
+	# Install only our dtb (avoid full dtbs_install of broken sibling boards)
+	install -Dm644 "$builddir/arch/$_carch/boot/dts/qcom/sm6225-xiaomi-xun.dtb" \
+		"$pkgdir/boot/dtbs/qcom/sm6225-xiaomi-xun.dtb"
+	make modules_install \
 		ARCH="$_carch" \
-		INSTALL_PATH="$pkgdir"/boot/ \
 		INSTALL_MOD_PATH="$pkgdir" \
-		INSTALL_MOD_STRIP=1 \
-		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
+		INSTALL_MOD_STRIP=1
 	rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
 	install -D "$builddir"/include/config/kernel.release \
 		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
