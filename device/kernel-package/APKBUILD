@@ -1,7 +1,7 @@
 maintainer="Classity-Real <uiportsarchives@gmail.com>"
 pkgname=linux-postmarketos-qcom-sm6225
 pkgver=6.1
-pkgrel=8
+pkgrel=9
 pkgdesc="Mainline Kernel fork for SM6225 devices"
 arch="aarch64"
 _carch="arm64"
@@ -10,89 +10,92 @@ url="https://kernel.org"
 license="GPL-2.0-only"
 options="!strip !check !tracedeps pmb:cross-native"
 makedepends="
-        bash
-        bc
-        bison
-        devicepkg-dev
-        flex
-        openssl-dev
-        perl
+	bash
+	bc
+	bison
+	devicepkg-dev
+	flex
+	openssl-dev
+	perl
 "
 
 _repository="linux-sm6225"
 _commit="849f3f471b6268280dc8418e0bddda435ae5d4a5"
 _config="config-$_flavor.$arch"
 source="
-        $pkgname-$_commit.tar.gz::https://gitlab.com/TQMatvey/$_repository/-/archive/$_commit.tar.gz
-        $_config
-        sm6225-xiaomi-xun.dts
-        sm6225-dtsi-bundle.tar.gz
+	$pkgname-$_commit.tar.gz::https://gitlab.com/TQMatvey/$_repository/-/archive/$_commit.tar.gz
+	$_config
+	sm6225-xiaomi-xun.dts
+	sm6225-dtsi-bundle.tar.gz
 "
 builddir="$srcdir/$_repository-$_commit"
 
 prepare() {
-        default_prepare
-        cp "$srcdir/config-$_flavor.$arch" .config
-        cp "$srcdir/sm6225-xiaomi-xun.dts" arch/arm64/boot/dts/qcom/
-        printf 'dtb-$(CONFIG_ARCH_QCOM)	+= sm6225-xiaomi-xun.dtb
-' >> arch/arm64/boot/dts/qcom/Makefile
+	default_prepare
+	cp "$srcdir/config-$_flavor.$arch" .config
+	cp "$srcdir/sm6225-xiaomi-xun.dts" arch/arm64/boot/dts/qcom/
+	printf 'dtb-$(CONFIG_ARCH_QCOM)\t+= sm6225-xiaomi-xun.dtb\n' >> arch/arm64/boot/dts/qcom/Makefile
 
-        # Extract bundle
-        rm -rf /tmp/dtsi-extract
-        mkdir -p /tmp/dtsi-extract
-        tar xzf "$srcdir/sm6225-dtsi-bundle.tar.gz" -C /tmp/dtsi-extract --no-same-owner --no-same-permissions
+	# Extract bundle (mainline sm6115.dtsi renamed + missing dt-bindings)
+	rm -rf /tmp/dtsi-extract
+	mkdir -p /tmp/dtsi-extract
+	tar xzf "$srcdir/sm6225-dtsi-bundle.tar.gz" -C /tmp/dtsi-extract --no-same-owner --no-same-permissions
 
-        # Find extracted sm6225.dtsi (may be at root or with ./ prefix)
-        EXTRACTED=""
-        for cand in /tmp/dtsi-extract/sm6225.dtsi /tmp/dtsi-extract/./sm6225.dtsi; do
-                if [ -f "$cand" ]; then EXTRACTED="$cand"; break; fi
-        done
-        if [ -z "$EXTRACTED" ]; then
-                echo "ERROR: sm6225.dtsi not found in bundle"
-                ls -la /tmp/dtsi-extract/
-                exit 1
-        fi
+	EXTRACTED=""
+	for cand in /tmp/dtsi-extract/sm6225.dtsi /tmp/dtsi-extract/./sm6225.dtsi; do
+		if [ -f "$cand" ]; then EXTRACTED="$cand"; break; fi
+	done
+	if [ -z "$EXTRACTED" ]; then
+		echo "ERROR: sm6225.dtsi not found in bundle"
+		ls -laR /tmp/dtsi-extract/
+		exit 1
+	fi
 
-        # Replace fork's stub DTSI with mainline sm6115.dtsi content
-        cp "$EXTRACTED" arch/arm64/boot/dts/qcom/sm6225.dtsi
+	cp "$EXTRACTED" arch/arm64/boot/dts/qcom/sm6225.dtsi
 
-        # Install missing dt-bindings headers
-        if [ -d /tmp/dtsi-extract/dt-bindings ]; then
-                cp -rn /tmp/dtsi-extract/dt-bindings/* include/dt-bindings/
-        fi
+	if [ -d /tmp/dtsi-extract/dt-bindings ]; then
+		cp -rn /tmp/dtsi-extract/dt-bindings/* include/dt-bindings/
+	fi
 
-        echo "=== sm6225.dtsi line count after replace (should be 3453) ==="
-        wc -l arch/arm64/boot/dts/qcom/sm6225.dtsi
+	echo "=== sm6225.dtsi line count after replace (expect ~3453) ==="
+	wc -l arch/arm64/boot/dts/qcom/sm6225.dtsi
+	echo "=== first 5 includes of sm6225.dtsi ==="
+	grep '#include' arch/arm64/boot/dts/qcom/sm6225.dtsi | head -5
+	echo "=== dt-bindings clock headers present? ==="
+	ls -la include/dt-bindings/clock/qcom,gcc-sm6115.h include/dt-bindings/clock/qcom,sm6115-dispcc.h 2>&1 || true
 
-        # Force kernel to use its own appended DTB
-        sed -i '/mov.*x21, x0.*FDT/s/x0/xzr/' arch/arm64/kernel/head.S
-        echo "=== head.S line 116 after patch ==="
-        sed -n '116p' arch/arm64/kernel/head.S
+	# Force kernel to use its own appended DTB (ignore bootloader FDT)
+	sed -i '/mov.*x21, x0.*FDT/s/x0/xzr/' arch/arm64/kernel/head.S
+	echo "=== head.S FDT line after patch ==="
+	grep -n 'x21.*FDT\|x21, xzr' arch/arm64/kernel/head.S | head -3
 }
 
 build() {
-        unset LDFLAGS
-        export KBUILD_BUILD_TIMESTAMP="Mon Jan 1 00:00:00 UTC 2024"
-        export KBUILD_BUILD_USER=builder
-        export KBUILD_BUILD_HOST=ci
-        make ARCH="$_carch" CC="ccache ${CC:-gcc}" \
-                KBUILD_BUILD_VERSION="1" V=1
-        make ARCH="$_carch" CC="ccache ${CC:-gcc}" dtbs
-        ccache -s || true
+	unset LDFLAGS
+	export KBUILD_BUILD_TIMESTAMP="Mon Jan 1 00:00:00 UTC 2024"
+	export KBUILD_BUILD_USER=builder
+	export KBUILD_BUILD_HOST=ci
+	# No V=1 — verbose mode buries real errors under thousands of -Werror= flag lines
+	make ARCH="$_carch" CC="ccache ${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="1"
+	make ARCH="$_carch" CC="ccache ${CC:-gcc}" dtbs
+	echo "=== dtb size (expect ~50k if bundle took effect) ==="
+	ls -la arch/arm64/boot/dts/qcom/sm6225-xiaomi-xun.dtb || true
+	ccache -s || true
 }
 
 package() {
-        install -Dm644 "$builddir/arch/$_carch/boot/Image" \
-                "$pkgdir/boot/vmlinuz"
-        make modules_install dtbs_install \
-                ARCH="$_carch" \
-                INSTALL_PATH="$pkgdir"/boot/ \
-                INSTALL_MOD_PATH="$pkgdir" \
-                INSTALL_MOD_STRIP=1 \
-                INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
-        rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
-        install -D "$builddir"/include/config/kernel.release \
-                "$pkgdir"/usr/share/kernel/$_flavor/kernel.release
+	install -Dm644 "$builddir/arch/$_carch/boot/Image" \
+		"$pkgdir/boot/vmlinuz"
+	make modules_install dtbs_install \
+		ARCH="$_carch" \
+		INSTALL_PATH="$pkgdir"/boot/ \
+		INSTALL_MOD_PATH="$pkgdir" \
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
+	rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
+	install -D "$builddir"/include/config/kernel.release \
+		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
 }
 
 sha512sums="

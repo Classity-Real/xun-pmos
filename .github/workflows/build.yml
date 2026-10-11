@@ -114,12 +114,16 @@ jobs:
       - name: Dump pmbootstrap log
         if: always()
         run: |
-          echo "=========== ALL LINES WITH ERROR ==========="
-          sudo grep -niE "error|failed|undefined|no rule|dtc" \
-            /home/runner/.local/var/pmbootstrap/log.txt | tail -80 || true
+          echo "=========== PREPARE DIAGNOSTICS ==========="
+          sudo grep -nE "sm6225.dtsi line count|head.S FDT|dt-bindings clock|first 5 includes|dtb size" \
+            /home/runner/.local/var/pmbootstrap/log.txt || true
           echo ""
-          echo "=========== last 100 lines ==========="
-          sudo tail -n 100 /home/runner/.local/var/pmbootstrap/log.txt || true
+          echo "=========== REAL ERRORS (error: / Error 1 / dtc / No rule / undefined) ==========="
+          sudo grep -nE "error:|Error 1|>>> ERROR|No rule to make|undefined reference|FATAL ERROR|dtc:|Reference to non-existent" \
+            /home/runner/.local/var/pmbootstrap/log.txt | tail -60 || true
+          echo ""
+          echo "=========== last 80 lines ==========="
+          sudo tail -n 80 /home/runner/.local/var/pmbootstrap/log.txt || true
           echo ""
           echo "=========== export dir ==========="
           sudo ls -la /tmp/postmarketOS-export/ 2>/dev/null || echo "empty"
