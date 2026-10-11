@@ -1,7 +1,7 @@
 maintainer="Classity-Real <uiportsarchives@gmail.com>"
 pkgname=linux-postmarketos-qcom-sm6225
 pkgver=6.1
-pkgrel=10
+pkgrel=11
 pkgdesc="Mainline Kernel fork for SM6225 devices"
 arch="aarch64"
 _carch="arm64"
@@ -87,10 +87,8 @@ build() {
 	export KBUILD_BUILD_HOST=ci
 	make ARCH="$_carch" CC="ccache ${CC:-gcc}" \
 		KBUILD_BUILD_VERSION="1"
-	# Only build our board DTB — other fork boards include the new dtsi
-	# and fail if any header is still missing
-	make ARCH="$_carch" CC="ccache ${CC:-gcc}" \
-		arch/arm64/boot/dts/qcom/sm6225-xiaomi-xun.dtb
+	# Headers are force-copied; full dtbs is fine now
+	make ARCH="$_carch" CC="ccache ${CC:-gcc}" dtbs
 	echo "=== dtb size (expect ~50k if bundle took effect) ==="
 	ls -la arch/arm64/boot/dts/qcom/sm6225-xiaomi-xun.dtb || true
 	ccache -s || true
@@ -99,13 +97,12 @@ build() {
 package() {
 	install -Dm644 "$builddir/arch/$_carch/boot/Image" \
 		"$pkgdir/boot/vmlinuz"
-	# Install only our dtb (avoid full dtbs_install of broken sibling boards)
-	install -Dm644 "$builddir/arch/$_carch/boot/dts/qcom/sm6225-xiaomi-xun.dtb" \
-		"$pkgdir/boot/dtbs/qcom/sm6225-xiaomi-xun.dtb"
-	make modules_install \
+	make modules_install dtbs_install \
 		ARCH="$_carch" \
+		INSTALL_PATH="$pkgdir"/boot/ \
 		INSTALL_MOD_PATH="$pkgdir" \
-		INSTALL_MOD_STRIP=1
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
 	rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
 	install -D "$builddir"/include/config/kernel.release \
 		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
