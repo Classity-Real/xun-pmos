@@ -96,49 +96,33 @@ jobs:
           EXP=/tmp/postmarketOS-export
           echo "--- boot.img header before patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
-
-          # Match stock os_version field (seen in stock boot.img at offset 16)
           echo 99010020 | xxd -r -p | sudo dd of=$EXP/boot.img bs=1 seek=16 count=4 conv=notrunc
-
           echo "--- boot.img header after patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
-
-          # recovery.img = same image (for recovery_a if needed)
           sudo cp -a $EXP/boot.img $EXP/recovery.img
-
-          # Do NOT ship a generated vendor_boot – stock 96MB one is required
           if [ -f $EXP/vendor_boot.img ]; then
             echo "Removing generated vendor_boot.img (bootloader rejects it)"
             sudo rm -f $EXP/vendor_boot.img
           fi
-
-          # Clear flashing instructions
-          sudo tee $EXP/FLASHING.txt > /dev/null << 'EOF'
-Xiaomi Pad SE (xun) – postmarketOS flash instructions
-=====================================================
-
-CRITICAL: Keep the STOCK vendor_boot.img (96 MB).
-The generated pmOS vendor_boot is rejected by the bootloader
-(immediate reboot back to fastboot).
-
-1. Boot the tablet into fastboot (Power + Vol Down).
-2. From the second device:
-
-   fastboot flash boot_a boot.img
-   fastboot flash vendor_boot_a <path-to-stock-vendor_boot.img>
-   fastboot set_active a
-   fastboot reboot
-
-3. Wait up to 40 seconds. Logo should clear if the kernel starts.
-
-Optional (if you need recovery):
-   fastboot flash recovery_a recovery.img
-
-Backup first (on tablet, before any flash):
-   dd if=/dev/block/by-name/boot_a of=/sdcard/boot_a.backup.img
-   dd if=/dev/block/by-name/vendor_boot_a of=/sdcard/vendor_boot_a.backup.img
-EOF
-
+          printf '%s\n' \
+            'Xiaomi Pad SE (xun) - postmarketOS flash instructions' \
+            '=====================================================' \
+            '' \
+            'CRITICAL: Keep the STOCK vendor_boot.img (96 MB).' \
+            'The generated pmOS vendor_boot is rejected by the bootloader.' \
+            '' \
+            '1. Boot the tablet into fastboot (Power + Vol Down).' \
+            '2. From the second device:' \
+            '' \
+            '   fastboot flash boot_a boot.img' \
+            '   fastboot flash vendor_boot_a <path-to-stock-vendor_boot.img>' \
+            '   fastboot set_active a' \
+            '   fastboot reboot' \
+            '' \
+            '3. Wait up to 40 seconds. Logo should clear if the kernel starts.' \
+            '' \
+            'Optional: fastboot flash recovery_a recovery.img' \
+            | sudo tee $EXP/FLASHING.txt > /dev/null
           echo "=== Artifact contents ==="
           sudo ls -la $EXP/
           echo "DTB size (should be ~50 KB if bundle worked):"
