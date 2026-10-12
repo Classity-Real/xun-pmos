@@ -27,7 +27,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip git \
             multipath-tools parted e2fsprogs \
-            android-sdk-libsparse-utils device-tree-compiler
+            android-sdk-libsparse-utils device-tree-compiler xxd
+          curl -sL -o /tmp/mkbootimg.py \
+            https://raw.githubusercontent.com/LineageOS/android_system_tools_mkbootimg/lineage-18.1/mkbootimg.py
+          sudo cp /tmp/mkbootimg.py /usr/local/bin/mkbootimg.py
+          sudo chmod +x /usr/local/bin/mkbootimg.py
 
       - name: Clone pmbootstrap
         run: |
@@ -90,7 +94,7 @@ jobs:
       - name: Export
         run: sudo -E pmbootstrap --as-root export
 
-      - name: Patch boot.img + create recovery + FLASHING.txt
+      - name: Patch boot + build proper vendor_boot + FLASHING.txt
         run: |
           set -e
           EXP=/tmp/postmarketOS-export
@@ -100,32 +104,56 @@ jobs:
           echo "--- boot.img header after patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
           sudo cp -a $EXP/boot.img $EXP/recovery.img
-          if [ -f $EXP/vendor_boot.img ]; then
-            echo "Removing generated vendor_boot.img (bootloader rejects it)"
-            sudo rm -f $EXP/vendor_boot.img
+
+          sudo rm -f $EXP/vendor_boot.img
+
+          DTB=""
+          for p in $EXP/dtbs/sm6225-xiaomi-xun.dtb $EXP/dtbs/qcom/sm6225-xiaomi-xun.dtb; do
+            if [ -f "$p" ]; then DTB="$p"; break; fi
+          done
+          if [ -z "$DTB" ]; then
+            echo "ERROR: mainline DTB not found in export"
+            sudo find $EXP -name '*.dtb' -ls || true
+            exit 1
           fi
+          echo "Using DTB: $DTB ($(stat -c%s "$DTB") bytes)"
+
+          EMPTY=/tmp/empty_vendor_ramdisk
+          : > "$EMPTY"
+
+          sudo python3 /usr/local/bin/mkbootimg.py \
+            --header_version 4 \
+            --pagesize 4096 \
+            --base 0x00000000 \
+            --kernel_offset 0x00008000 \
+            --ramdisk_offset 0x01000000 \
+            --tags_offset 0x00000100 \
+            --dtb_offset 0x01f00000 \
+            --vendor_cmdline "earlycon=msm_geni_serial,0x4a90000 console=ttyMSM0,115200n8 clk_ignore_unused pd_ignore_unused loglevel=8" \
+            --vendor_ramdisk "$EMPTY" \
+            --dtb "$DTB" \
+            --vendor_boot $EXP/vendor_boot.img
+
+          echo "--- new vendor_boot header ---"
+          sudo xxd -l 64 $EXP/vendor_boot.img || true
+          echo "vendor_boot size: $(stat -c%s $EXP/vendor_boot.img)"
+
           printf '%s\n' \
             'Xiaomi Pad SE (xun) - postmarketOS flash instructions' \
             '=====================================================' \
             '' \
-            'CRITICAL: Keep the STOCK vendor_boot.img (96 MB).' \
-            'The generated pmOS vendor_boot is rejected by the bootloader.' \
-            '' \
-            '1. Boot the tablet into fastboot (Power + Vol Down).' \
-            '2. From the second device:' \
+            'Flash BOTH images (proper mainline vendor_boot):' \
             '' \
             '   fastboot flash boot_a boot.img' \
-            '   fastboot flash vendor_boot_a <path-to-stock-vendor_boot.img>' \
+            '   fastboot flash vendor_boot_a vendor_boot.img' \
             '   fastboot set_active a' \
             '   fastboot reboot' \
             '' \
-            '3. Wait up to 40 seconds. Logo should clear if the kernel starts.' \
-            '' \
-            'Optional: fastboot flash recovery_a recovery.img' \
+            'Restore stock if needed with your backed-up images.' \
             | sudo tee $EXP/FLASHING.txt > /dev/null
+
           echo "=== Artifact contents ==="
           sudo ls -la $EXP/
-          echo "DTB size (should be ~50 KB if bundle worked):"
           sudo ls -la $EXP/dtbs/ 2>/dev/null || true
 
       - name: Check ccache state

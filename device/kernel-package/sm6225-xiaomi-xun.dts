@@ -7,49 +7,38 @@
 #include <dt-bindings/input/gpio-keys.h>
 
 / {
-        qcom,board-id = <0x20022 0x00>;
-        qcom,msm-id = <0x206 0x10000>;
+	qcom,board-id = <0x20022 0x00>;
+	qcom,msm-id = <0x206 0x10000>;
 
-        model = "Xiaomi Pad SE";
-        compatible = "xiaomi,xun", "qcom,sm6225";
-        chassis-type = "tablet";
+	model = "Xiaomi Pad SE";
+	compatible = "xiaomi,xun", "qcom,sm6225", "qcom,khaje";
+	chassis-type = "tablet";
 
-        memory@40000000 {
-                device_type = "memory";
-                reg = <0x00 0x40000000 0x00 0x3bb00000>,
-                      <0x01 0x40000000 0x01 0x00>,
-                      <0x00 0x80000000 0x00 0xc0000000>;
-        };
+	/* Conservative memory map – refine once we have working earlycon */
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0x0 0x40000000 0x0 0xc0000000>;
+	};
 
-        reserved-memory {
-                #address-cells = <2>;
-                #size-cells = <2>;
-                ranges;
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
 
-                ramoops@5d000000 {
-                        compatible = "ramoops";
-                        reg = <0x00 0x5d000000 0x00 0x200000>;
-                        console-size = <0x80000>;
-                        record-size = <0x40000>;
-                        pmsg-size = <0x100000>;
-                        no-map;
-                };
-        };
+		/* Match Android ramoops region if present */
+		ramoops@5d000000 {
+			compatible = "ramoops";
+			reg = <0x0 0x5d000000 0x0 0x200000>;
+			console-size = <0x80000>;
+			record-size = <0x40000>;
+			pmsg-size = <0x100000>;
+			no-map;
+		};
+	};
 
-        chosen {
-                bootargs = "earlycon=msm_geni_serial,0x4a90000 console=tty0 console=ttyMSM0,115200n8 PMOS_NOSPLASH clk_ignore_unused pd_ignore_unused loglevel=8 ignore_loglevel";
-                #address-cells = <2>;
-                #size-cells = <2>;
-                ranges;
-                stdout-path = "framebuffer0";
-                framebuffer0: framebuffer@5c000000 {
-                        compatible = "simple-framebuffer";
-                        reg = <0 0x5c000000 0 (1920 * 1200 * 4)>;
-                        width = <1200>;
-                        height = <1920>;
-                        stride = <(1200 * 4)>;
-                        format = "a8r8g8b8";
-                        status = "okay";
-                };
-        };
+	chosen {
+		/* earlycon must work without display – do NOT use simple-framebuffer yet */
+		bootargs = "earlycon=msm_geni_serial,0x4a90000 console=ttyMSM0,115200n8 console=tty0 clk_ignore_unused pd_ignore_unused loglevel=8 ignore_loglevel PMOS_NOSPLASH";
+		stdout-path = "serial0:115200n8";
+	};
 };
