@@ -72,11 +72,6 @@ jobs:
             'work = /home/runner/.local/var/pmbootstrap' \
             > $HOME/.config/pmbootstrap_v3.cfg
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
-          echo "=== FINAL CONFIG ==="
-          cat $HOME/.config/pmbootstrap_v3.cfg
-          echo ""
-          echo "=== pmbootstrap sees ==="
-          sudo -E pmbootstrap --as-root config 2>&1 | grep -E "device|service_manager|is_default_channel|ccache_size"
 
       - name: Prepare ccache dir
         run: |
@@ -94,13 +89,61 @@ jobs:
 
       - name: Export
         run: sudo -E pmbootstrap --as-root export
-      - name: Patch boot.img os_version
+
+      - name: Patch boot.img + create recovery + FLASHING.txt
         run: |
-          echo "--- before ---"
-          sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
-          echo 99010020 | xxd -r -p | sudo dd of=/tmp/postmarketOS-export/boot.img bs=1 seek=16 count=4 conv=notrunc
-          echo "--- after ---"
-          sudo xxd -l 48 /tmp/postmarketOS-export/boot.img
+          set -e
+          EXP=/tmp/postmarketOS-export
+          echo "--- boot.img header before patch ---"
+          sudo xxd -l 48 $EXP/boot.img || true
+
+          # Match stock os_version field (seen in stock boot.img at offset 16)
+          echo 99010020 | xxd -r -p | sudo dd of=$EXP/boot.img bs=1 seek=16 count=4 conv=notrunc
+
+          echo "--- boot.img header after patch ---"
+          sudo xxd -l 48 $EXP/boot.img || true
+
+          # recovery.img = same image (for recovery_a if needed)
+          sudo cp -a $EXP/boot.img $EXP/recovery.img
+
+          # Do NOT ship a generated vendor_boot – stock 96MB one is required
+          if [ -f $EXP/vendor_boot.img ]; then
+            echo "Removing generated vendor_boot.img (bootloader rejects it)"
+            sudo rm -f $EXP/vendor_boot.img
+          fi
+
+          # Clear flashing instructions
+          sudo tee $EXP/FLASHING.txt > /dev/null << 'EOF'
+Xiaomi Pad SE (xun) – postmarketOS flash instructions
+=====================================================
+
+CRITICAL: Keep the STOCK vendor_boot.img (96 MB).
+The generated pmOS vendor_boot is rejected by the bootloader
+(immediate reboot back to fastboot).
+
+1. Boot the tablet into fastboot (Power + Vol Down).
+2. From the second device:
+
+   fastboot flash boot_a boot.img
+   fastboot flash vendor_boot_a <path-to-stock-vendor_boot.img>
+   fastboot set_active a
+   fastboot reboot
+
+3. Wait up to 40 seconds. Logo should clear if the kernel starts.
+
+Optional (if you need recovery):
+   fastboot flash recovery_a recovery.img
+
+Backup first (on tablet, before any flash):
+   dd if=/dev/block/by-name/boot_a of=/sdcard/boot_a.backup.img
+   dd if=/dev/block/by-name/vendor_boot_a of=/sdcard/vendor_boot_a.backup.img
+EOF
+
+          echo "=== Artifact contents ==="
+          sudo ls -la $EXP/
+          echo "DTB size (should be ~50 KB if bundle worked):"
+          sudo ls -la $EXP/dtbs/ 2>/dev/null || true
+
       - name: Check ccache state
         if: always()
         run: sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
@@ -109,24 +152,16 @@ jobs:
         if: always()
         run: |
           sudo ls -la /tmp/postmarketOS-export/ || true
-          sudo dtc -I dtb -O dts /tmp/postmarketOS-export/dtbs/qcom/sm6225-xiaomi-xun.dtb 2>/dev/null | grep -E "model|compatible|board-id" || true
+          sudo ls -la /tmp/postmarketOS-export/dtbs/ 2>/dev/null || true
 
       - name: Dump pmbootstrap log
         if: always()
         run: |
-          echo "=========== PREPARE DIAGNOSTICS ==========="
-          sudo grep -nE "sm6225.dtsi line count|head.S FDT|dt-bindings clock|first 5 includes|dtb size" \
-            /home/runner/.local/var/pmbootstrap/log.txt || true
-          echo ""
-          echo "=========== REAL ERRORS (error: / Error 1 / dtc / No rule / undefined) ==========="
+          echo "=========== REAL ERRORS ==========="
           sudo grep -nE "error:|Error 1|>>> ERROR|No rule to make|undefined reference|FATAL ERROR|dtc:|Reference to non-existent" \
-            /home/runner/.local/var/pmbootstrap/log.txt | tail -60 || true
-          echo ""
-          echo "=========== last 80 lines ==========="
-          sudo tail -n 80 /home/runner/.local/var/pmbootstrap/log.txt || true
-          echo ""
-          echo "=========== export dir ==========="
-          sudo ls -la /tmp/postmarketOS-export/ 2>/dev/null || echo "empty"
+            /home/runner/.local/var/pmbootstrap/log.txt | tail -40 || true
+          echo "=========== last 40 lines ==========="
+          sudo tail -n 40 /home/runner/.local/var/pmbootstrap/log.txt || true
 
       - name: Fix artifact permissions
         if: always()
