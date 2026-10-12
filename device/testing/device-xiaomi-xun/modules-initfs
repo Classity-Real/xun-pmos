@@ -1,9 +1,29 @@
-# Remove this file if unnecessary (CHANGEME!)
-# This file shall contain a list of modules to be included in the initramfs,
-# so that they are available in early boot stages. In general, it should
-# include modules to support unlocking FDE (touchscreen, panel, etc),
-# USB networking, and telnet in the debug-shell.
-# The format is one module name per line. Lines starting with the character
-# '#', and empty lines are ignored. If there are multiple kernel variants
-# with different initramfs module requirements, one modules-initfs.$variant
-# file should be created for each of them.
+# Initramfs modules for Xiaomi Pad SE (xun / m84)
+# Sourced from MiCode vendor_qcom_proprietary_display-devicetree (xun-t-oss)
+#
+# Panel (proprietary DSI video-mode, 1200x1920):
+#   dsi_panel_m84_36_02_0a_fhdp_video / dsi_panel_m84_35_03_0b_fhdp_video
+#   Backlight via DCS, reset GPIO TLMM 82
+#
+# Touch (SPI on qupv3_se0_spi):
+#   compatible = "focaltech,fts", "novatek,NVT-ts-spi"
+#   IRQ TLMM 80, reset TLMM 86
+#
+# Display / panel (mainline MSM DRM)
+msm
+# Primary touch target (mainline focaltech_fts when present)
+focaltech_fts
+# Fallback / common Xiaomi tablet controllers
+goodix
+edt-ft5x06
+atmel_mxt_ts
+# Input / backlight
+backlight
+pwm_bl
+qcom-spmi-haptics
+# USB networking (debug-shell / ssh over USB)
+g_ether
+usb_f_rndis
+# Storage / firmware helpers often needed early
+ufs_qcom
+phy_qcom_qmp_ufs
