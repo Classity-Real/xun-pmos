@@ -2,7 +2,7 @@
 maintainer="Classity-Real <uiportsarchives@gmail.com>"
 pkgname=device-xiaomi-xun
 pkgver=1
-pkgrel=1
+pkgrel=2
 pkgdesc="Xiaomi Pad SE"
 url="https://postmarketos.org"
 arch="aarch64"
@@ -33,6 +33,6 @@ package() {
 }
 
 sha512sums="
-a4108ce7f64876b121f0b6793b62a8a8d6b9367e49b3d707223f51b61e2dd8f5200037f6f2a147ef0dc7eb7e2637f244ed02cfde432d207f388eadbd6b453645  deviceinfo
+0a25039a9a75fcb61747abeb8eecc1908a103e6aa14323b99eb6cb5c85877e4344f137c5ee453d36401f88ec2e7898754ee22a2f7d26796dea667413cd8131cf  deviceinfo
 e3838b126b7a9c173a01b84e9e60d87166b02ce2cbac714041b8f7a0df07a714a5f425df92ee1d2461ab77e93414172b5ef12a6eec115d49c5dea884815f629b  modules-initfs
 "
