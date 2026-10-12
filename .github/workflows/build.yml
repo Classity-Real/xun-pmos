@@ -106,15 +106,15 @@ jobs:
           # recovery.img = same image (for recovery_a if needed)
           sudo cp -a $EXP/boot.img $EXP/recovery.img
 
-          # Do NOT ship a generated vendor_boot – stock 96MB one is required
+          # Do NOT ship a generated vendor_boot - stock 96MB one is required
           if [ -f $EXP/vendor_boot.img ]; then
             echo "Removing generated vendor_boot.img (bootloader rejects it)"
             sudo rm -f $EXP/vendor_boot.img
           fi
 
-          # Clear flashing instructions
-          sudo tee $EXP/FLASHING.txt > /dev/null << 'EOF'
-Xiaomi Pad SE (xun) – postmarketOS flash instructions
+          # Flash instructions (no heredoc - avoids YAML parse issues)
+          sudo bash -c "cat > $EXP/FLASHING.txt" << 'ENDFLASH'
+Xiaomi Pad SE (xun) - postmarketOS flash instructions
 =====================================================
 
 CRITICAL: Keep the STOCK vendor_boot.img (96 MB).
@@ -137,7 +137,7 @@ Optional (if you need recovery):
 Backup first (on tablet, before any flash):
    dd if=/dev/block/by-name/boot_a of=/sdcard/boot_a.backup.img
    dd if=/dev/block/by-name/vendor_boot_a of=/sdcard/vendor_boot_a.backup.img
-EOF
+ENDFLASH
 
           echo "=== Artifact contents ==="
           sudo ls -la $EXP/
