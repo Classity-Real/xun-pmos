@@ -98,6 +98,9 @@ jobs:
         run: |
           set -e
           EXP=/tmp/postmarketOS-export
+          # export dir is root-owned from pmbootstrap
+          sudo chmod -R a+rX "$EXP" || true
+
           echo "--- boot.img header before patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
           echo 99010020 | xxd -r -p | sudo dd of=$EXP/boot.img bs=1 seek=16 count=4 conv=notrunc
@@ -109,21 +112,20 @@ jobs:
 
           DTB=""
           for p in $EXP/dtbs/sm6225-xiaomi-xun.dtb $EXP/dtbs/qcom/sm6225-xiaomi-xun.dtb; do
-            if [ -f "$p" ]; then DTB="$p"; break; fi
+            if sudo test -f "$p"; then DTB="$p"; break; fi
           done
           if [ -z "$DTB" ]; then
             echo "ERROR: mainline DTB not found in export"
             sudo find $EXP -name '*.dtb' -ls || true
             exit 1
           fi
-          echo "Using DTB: $DTB ($(stat -c%s "$DTB") bytes)"
+          echo "Using DTB: $DTB ($(sudo stat -c%s "$DTB") bytes)"
 
-          # Minimal non-empty vendor ramdisk (empty gzip cpio)
           VRAM=/tmp/vendor_ramdisk.cpio.gz
           echo | cpio -o -H newc 2>/dev/null | gzip -n > "$VRAM"
-          # Pad vendor ramdisk a bit so size is non-trivial (~64KB)
           dd if=/dev/zero bs=1024 count=64 >> "$VRAM" 2>/dev/null || true
 
+          # Build into /tmp first (runner-writable), then install with sudo
           sudo python3 /usr/local/bin/mkbootimg.py \
             --header_version 4 \
             --pagesize 4096 \
@@ -141,21 +143,22 @@ jobs:
           xxd -l 64 /tmp/vendor_boot_raw.img || true
           echo "raw size: $(stat -c%s /tmp/vendor_boot_raw.img)"
 
-          # Pad to stock vendor_boot partition size (96 MiB = 100663296)
           STOCK_SIZE=100663296
-          sudo dd if=/tmp/vendor_boot_raw.img of=$EXP/vendor_boot.img bs=1M status=none
-          CUR=$(stat -c%s $EXP/vendor_boot.img)
+          # Pad in /tmp then copy into export with sudo
+          cp /tmp/vendor_boot_raw.img /tmp/vendor_boot_padded.img
+          CUR=$(stat -c%s /tmp/vendor_boot_padded.img)
           if [ "$CUR" -lt "$STOCK_SIZE" ]; then
             PAD=$((STOCK_SIZE - CUR))
             echo "Padding vendor_boot by $PAD bytes to $STOCK_SIZE"
-            sudo dd if=/dev/zero bs=1 count="$PAD" status=none >> $EXP/vendor_boot.img
+            dd if=/dev/zero bs=1M count=$(( (PAD + 1048575) / 1048576 )) status=none >> /tmp/vendor_boot_padded.img
           fi
-          # ensure exact size
-          sudo truncate -s "$STOCK_SIZE" $EXP/vendor_boot.img
+          truncate -s "$STOCK_SIZE" /tmp/vendor_boot_padded.img
+          sudo cp /tmp/vendor_boot_padded.img $EXP/vendor_boot.img
+          sudo chmod 644 $EXP/vendor_boot.img
 
           echo "--- final vendor_boot ---"
           sudo xxd -l 64 $EXP/vendor_boot.img || true
-          echo "final size: $(stat -c%s $EXP/vendor_boot.img)"
+          echo "final size: $(sudo stat -c%s $EXP/vendor_boot.img)"
 
           printf '%s\n' \
             'Xiaomi Pad SE (xun) - postmarketOS flash instructions' \
