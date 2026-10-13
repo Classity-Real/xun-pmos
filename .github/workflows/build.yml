@@ -27,7 +27,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip git \
             multipath-tools parted e2fsprogs \
-            android-sdk-libsparse-utils device-tree-compiler xxd
+            android-sdk-libsparse-utils device-tree-compiler xxd cpio gzip
           curl -sL -o /tmp/mkbootimg.py \
             https://raw.githubusercontent.com/LineageOS/android_system_tools_mkbootimg/lineage-18.1/mkbootimg.py
           sudo cp /tmp/mkbootimg.py /usr/local/bin/mkbootimg.py
@@ -94,7 +94,7 @@ jobs:
       - name: Export
         run: sudo -E pmbootstrap --as-root export
 
-      - name: Patch boot + build proper vendor_boot + FLASHING.txt
+      - name: Patch boot + build padded vendor_boot + FLASHING.txt
         run: |
           set -e
           EXP=/tmp/postmarketOS-export
@@ -118,8 +118,9 @@ jobs:
           fi
           echo "Using DTB: $DTB ($(stat -c%s "$DTB") bytes)"
 
-          EMPTY=/tmp/empty_vendor_ramdisk
-          : > "$EMPTY"
+          VRAM=/tmp/vendor_ramdisk.cpio.gz
+          echo | cpio -o -H newc 2>/dev/null | gzip -n > "$VRAM"
+          dd if=/dev/zero bs=1024 count=64 >> "$VRAM" 2>/dev/null || true
 
           sudo python3 /usr/local/bin/mkbootimg.py \
             --header_version 4 \
@@ -130,26 +131,43 @@ jobs:
             --tags_offset 0x00000100 \
             --dtb_offset 0x01f00000 \
             --vendor_cmdline "earlycon=msm_geni_serial,0x4a90000 console=ttyMSM0,115200n8 clk_ignore_unused pd_ignore_unused loglevel=8" \
-            --vendor_ramdisk "$EMPTY" \
+            --vendor_ramdisk "$VRAM" \
             --dtb "$DTB" \
-            --vendor_boot $EXP/vendor_boot.img
+            --vendor_boot /tmp/vendor_boot_raw.img
 
-          echo "--- new vendor_boot header ---"
+          echo "--- raw vendor_boot header ---"
+          xxd -l 64 /tmp/vendor_boot_raw.img || true
+          echo "raw size: $(stat -c%s /tmp/vendor_boot_raw.img)"
+
+          STOCK_SIZE=100663296
+          sudo dd if=/tmp/vendor_boot_raw.img of=$EXP/vendor_boot.img bs=1M status=none
+          CUR=$(stat -c%s $EXP/vendor_boot.img)
+          if [ "$CUR" -lt "$STOCK_SIZE" ]; then
+            PAD=$((STOCK_SIZE - CUR))
+            echo "Padding vendor_boot by $PAD bytes to $STOCK_SIZE"
+            sudo dd if=/dev/zero bs=1 count="$PAD" status=none >> $EXP/vendor_boot.img
+          fi
+          sudo truncate -s "$STOCK_SIZE" $EXP/vendor_boot.img
+
+          echo "--- final vendor_boot ---"
           sudo xxd -l 64 $EXP/vendor_boot.img || true
-          echo "vendor_boot size: $(stat -c%s $EXP/vendor_boot.img)"
+          echo "final size: $(stat -c%s $EXP/vendor_boot.img)"
 
           printf '%s\n' \
             'Xiaomi Pad SE (xun) - postmarketOS flash instructions' \
             '=====================================================' \
             '' \
-            'Flash BOTH images (proper mainline vendor_boot):' \
+            'vendor_boot is padded to stock size (96 MB) with mainline DTB.' \
+            '' \
+            '1. Boot into fastboot (Power + Vol Down).' \
+            '2. From second device:' \
             '' \
             '   fastboot flash boot_a boot.img' \
             '   fastboot flash vendor_boot_a vendor_boot.img' \
             '   fastboot set_active a' \
             '   fastboot reboot' \
             '' \
-            'Restore stock if needed with your backed-up images.' \
+            'If stuck, restore stock boot + vendor_boot then reboot.' \
             | sudo tee $EXP/FLASHING.txt > /dev/null
 
           echo "=== Artifact contents ==="
