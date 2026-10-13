@@ -27,8 +27,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip git \
             multipath-tools parted e2fsprogs \
-            android-sdk-libsparse-utils device-tree-compiler xxd
-          # Lineage 18.1 mkbootimg.py (supports vendor_boot, no GKI cert dep)
+            android-sdk-libsparse-utils device-tree-compiler xxd cpio gzip
           curl -sL -o /tmp/mkbootimg.py \
             https://raw.githubusercontent.com/LineageOS/android_system_tools_mkbootimg/lineage-18.1/mkbootimg.py
           sudo cp /tmp/mkbootimg.py /usr/local/bin/mkbootimg.py
@@ -95,7 +94,7 @@ jobs:
       - name: Export
         run: sudo -E pmbootstrap --as-root export
 
-      - name: Patch boot + build proper vendor_boot + FLASHING.txt
+      - name: Patch boot + build padded vendor_boot + FLASHING.txt
         run: |
           set -e
           EXP=/tmp/postmarketOS-export
@@ -106,10 +105,8 @@ jobs:
           sudo xxd -l 48 $EXP/boot.img || true
           sudo cp -a $EXP/boot.img $EXP/recovery.img
 
-          # Remove broken boot-deploy vendor_boot (wrong format)
           sudo rm -f $EXP/vendor_boot.img
 
-          # Locate our mainline DTB
           DTB=""
           for p in $EXP/dtbs/sm6225-xiaomi-xun.dtb $EXP/dtbs/qcom/sm6225-xiaomi-xun.dtb; do
             if [ -f "$p" ]; then DTB="$p"; break; fi
@@ -121,11 +118,12 @@ jobs:
           fi
           echo "Using DTB: $DTB ($(stat -c%s "$DTB") bytes)"
 
-          # Minimal empty vendor ramdisk (page-aligned empty file is fine)
-          EMPTY=/tmp/empty_vendor_ramdisk
-          : > "$EMPTY"
+          # Minimal non-empty vendor ramdisk (empty gzip cpio)
+          VRAM=/tmp/vendor_ramdisk.cpio.gz
+          echo | cpio -o -H newc 2>/dev/null | gzip -n > "$VRAM"
+          # Pad vendor ramdisk a bit so size is non-trivial (~64KB)
+          dd if=/dev/zero bs=1024 count=64 >> "$VRAM" 2>/dev/null || true
 
-          # Real header-v4 vendor_boot (matches stock addresses)
           sudo python3 /usr/local/bin/mkbootimg.py \
             --header_version 4 \
             --pagesize 4096 \
@@ -135,36 +133,45 @@ jobs:
             --tags_offset 0x00000100 \
             --dtb_offset 0x01f00000 \
             --vendor_cmdline "earlycon=msm_geni_serial,0x4a90000 console=ttyMSM0,115200n8 clk_ignore_unused pd_ignore_unused loglevel=8" \
-            --vendor_ramdisk "$EMPTY" \
+            --vendor_ramdisk "$VRAM" \
             --dtb "$DTB" \
-            --vendor_boot $EXP/vendor_boot.img
+            --vendor_boot /tmp/vendor_boot_raw.img
 
-          echo "--- new vendor_boot header ---"
+          echo "--- raw vendor_boot header ---"
+          xxd -l 64 /tmp/vendor_boot_raw.img || true
+          echo "raw size: $(stat -c%s /tmp/vendor_boot_raw.img)"
+
+          # Pad to stock vendor_boot partition size (96 MiB = 100663296)
+          STOCK_SIZE=100663296
+          sudo dd if=/tmp/vendor_boot_raw.img of=$EXP/vendor_boot.img bs=1M status=none
+          CUR=$(stat -c%s $EXP/vendor_boot.img)
+          if [ "$CUR" -lt "$STOCK_SIZE" ]; then
+            PAD=$((STOCK_SIZE - CUR))
+            echo "Padding vendor_boot by $PAD bytes to $STOCK_SIZE"
+            sudo dd if=/dev/zero bs=1 count="$PAD" status=none >> $EXP/vendor_boot.img
+          fi
+          # ensure exact size
+          sudo truncate -s "$STOCK_SIZE" $EXP/vendor_boot.img
+
+          echo "--- final vendor_boot ---"
           sudo xxd -l 64 $EXP/vendor_boot.img || true
-          echo "vendor_boot size: $(stat -c%s $EXP/vendor_boot.img)"
+          echo "final size: $(stat -c%s $EXP/vendor_boot.img)"
 
           printf '%s\n' \
             'Xiaomi Pad SE (xun) - postmarketOS flash instructions' \
             '=====================================================' \
             '' \
-            'This build includes a PROPER header-v4 vendor_boot.img with the' \
-            'mainline DTB (stock vendor_boot has Qualcomm reference DTBs that' \
-            'do not match mainline and cause an early hang with no logs).' \
+            'vendor_boot is padded to stock size (96 MB) with mainline DTB.' \
             '' \
-            '1. Boot the tablet into fastboot (Power + Vol Down).' \
-            '2. From the second device:' \
+            '1. Boot into fastboot (Power + Vol Down).' \
+            '2. From second device:' \
             '' \
             '   fastboot flash boot_a boot.img' \
             '   fastboot flash vendor_boot_a vendor_boot.img' \
             '   fastboot set_active a' \
             '   fastboot reboot' \
             '' \
-            '3. Wait up to 40 seconds.' \
-            '' \
-            'If it fails, restore stock:' \
-            '   fastboot flash boot_a <stock-boot.img>' \
-            '   fastboot flash vendor_boot_a <stock-vendor_boot.img>' \
-            '   fastboot reboot' \
+            'If stuck, restore stock boot + vendor_boot then reboot.' \
             | sudo tee $EXP/FLASHING.txt > /dev/null
 
           echo "=== Artifact contents ==="
