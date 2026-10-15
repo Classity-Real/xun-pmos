@@ -5,6 +5,9 @@ deviceinfo_manufacturer="Xiaomi"
 deviceinfo_codename="xiaomi-xun"
 deviceinfo_year="2023"
 deviceinfo_dtb="qcom/sm6225-xiaomi-xun"
+# Append mainline DTB to kernel Image inside boot.img. Combined with the
+# head.S FDT-ignore patch in the kernel package, the kernel uses OUR DTB
+# even when stock vendor_boot is left in place.
 deviceinfo_append_dtb="true"
 deviceinfo_arch="aarch64"
 
@@ -17,17 +20,17 @@ deviceinfo_generate_bootimg="true"
 deviceinfo_bootimg_qcdt="false"
 deviceinfo_flash_pagesize="4096"
 deviceinfo_header_version="4"
+# Empty: stock vendor_boot already supplies cmdline (video=vfb..., bootconfig, etc.)
 deviceinfo_kernel_cmdline=""
 
-# IMPORTANT (xun / SM6225):
-# Stock vendor_boot.img is 96 MB and strictly validated by the bootloader.
-# The generated pmOS vendor_boot (~8 MB) is REJECTED (immediate reboot to
-# fastboot). Always keep the STOCK vendor_boot.img and only replace boot.
+# FLASH STRATEGY (proven on this device):
+#   - Stock vendor_boot.img (96 MB) is STRICTLY validated. Custom vendor_boot
+#     (even padded to 96 MB) is rejected → immediate reboot to fastboot.
+#   - Only flash boot_a with our boot.img.
+#   - Keep stock vendor_boot_a.
+#   - Kernel ignores bootloader FDT (head.S) and uses the DTB appended to Image.
 #
-# Flash procedure:
 #   fastboot flash boot_a boot.img
-#   fastboot flash vendor_boot_a <stock-vendor_boot.img>
+#   fastboot flash vendor_boot_a <STOCK-vendor_boot.img>
 #   fastboot set_active a
 #   fastboot reboot
-#
-# recovery.img is a copy of the patched boot.img (for recovery_a if needed).

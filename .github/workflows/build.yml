@@ -28,10 +28,6 @@ jobs:
           sudo apt-get install -y python3 python3-pip git \
             multipath-tools parted e2fsprogs \
             android-sdk-libsparse-utils device-tree-compiler xxd cpio gzip
-          curl -sL -o /tmp/mkbootimg.py \
-            https://raw.githubusercontent.com/LineageOS/android_system_tools_mkbootimg/lineage-18.1/mkbootimg.py
-          sudo cp /tmp/mkbootimg.py /usr/local/bin/mkbootimg.py
-          sudo chmod +x /usr/local/bin/mkbootimg.py
 
       - name: Clone pmbootstrap
         run: |
@@ -94,20 +90,22 @@ jobs:
       - name: Export
         run: sudo -E pmbootstrap --as-root export
 
-      - name: Patch boot + build padded vendor_boot + FLASHING.txt
+      - name: Patch boot + drop custom vendor_boot + FLASHING.txt
         run: |
           set -e
           EXP=/tmp/postmarketOS-export
-          # export dir is root-owned from pmbootstrap
           sudo chmod -R a+rX "$EXP" || true
 
           echo "--- boot.img header before patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
+          # os_version / os_patch_level patch used previously
           echo 99010020 | xxd -r -p | sudo dd of=$EXP/boot.img bs=1 seek=16 count=4 conv=notrunc
           echo "--- boot.img header after patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
           sudo cp -a $EXP/boot.img $EXP/recovery.img
 
+          # Xiaomi rejects any non-stock vendor_boot (even 96MB padded).
+          # Strategy: stock vendor_boot + boot.img with append_dtb + head.S ignore FDT.
           sudo rm -f $EXP/vendor_boot.img
 
           DTB=""
@@ -119,62 +117,36 @@ jobs:
             sudo find $EXP -name '*.dtb' -ls || true
             exit 1
           fi
-          echo "Using DTB: $DTB ($(sudo stat -c%s "$DTB") bytes)"
+          echo "DTB: $DTB ($(sudo stat -c%s "$DTB") bytes)"
 
-          VRAM=/tmp/vendor_ramdisk.cpio.gz
-          echo | cpio -o -H newc 2>/dev/null | gzip -n > "$VRAM"
-          dd if=/dev/zero bs=1024 count=64 >> "$VRAM" 2>/dev/null || true
-
-          # Build into /tmp first (runner-writable), then install with sudo
-          sudo python3 /usr/local/bin/mkbootimg.py \
-            --header_version 4 \
-            --pagesize 4096 \
-            --base 0x00000000 \
-            --kernel_offset 0x00008000 \
-            --ramdisk_offset 0x01000000 \
-            --tags_offset 0x00000100 \
-            --dtb_offset 0x01f00000 \
-            --vendor_cmdline "earlycon=msm_geni_serial,0x4a90000 console=ttyMSM0,115200n8 clk_ignore_unused pd_ignore_unused loglevel=8" \
-            --vendor_ramdisk "$VRAM" \
-            --dtb "$DTB" \
-            --vendor_boot /tmp/vendor_boot_raw.img
-
-          echo "--- raw vendor_boot header ---"
-          xxd -l 64 /tmp/vendor_boot_raw.img || true
-          echo "raw size: $(stat -c%s /tmp/vendor_boot_raw.img)"
-
-          STOCK_SIZE=100663296
-          # Pad in /tmp then copy into export with sudo
-          cp /tmp/vendor_boot_raw.img /tmp/vendor_boot_padded.img
-          CUR=$(stat -c%s /tmp/vendor_boot_padded.img)
-          if [ "$CUR" -lt "$STOCK_SIZE" ]; then
-            PAD=$((STOCK_SIZE - CUR))
-            echo "Padding vendor_boot by $PAD bytes to $STOCK_SIZE"
-            dd if=/dev/zero bs=1M count=$(( (PAD + 1048575) / 1048576 )) status=none >> /tmp/vendor_boot_padded.img
+          # Sanity: boot.img should be larger than a bare Image if append_dtb worked
+          BOOT_SZ=$(sudo stat -c%s $EXP/boot.img)
+          echo "boot.img size: $BOOT_SZ"
+          if [ "$BOOT_SZ" -lt 10000000 ]; then
+            echo "WARNING: boot.img looks unusually small"
           fi
-          truncate -s "$STOCK_SIZE" /tmp/vendor_boot_padded.img
-          sudo cp /tmp/vendor_boot_padded.img $EXP/vendor_boot.img
-          sudo chmod 644 $EXP/vendor_boot.img
-
-          echo "--- final vendor_boot ---"
-          sudo xxd -l 64 $EXP/vendor_boot.img || true
-          echo "final size: $(sudo stat -c%s $EXP/vendor_boot.img)"
 
           printf '%s\n' \
             'Xiaomi Pad SE (xun) - postmarketOS flash instructions' \
             '=====================================================' \
             '' \
-            'vendor_boot is padded to stock size (96 MB) with mainline DTB.' \
+            'DO NOT flash a custom vendor_boot.img — the bootloader rejects it.' \
+            'Always restore STOCK vendor_boot (96 MB) if you overwrote it.' \
+            '' \
+            'This boot.img has the mainline DTB appended (append_dtb=true).' \
+            'The kernel ignores the bootloader FDT and uses the appended DTB.' \
             '' \
             '1. Boot into fastboot (Power + Vol Down).' \
             '2. From second device:' \
             '' \
             '   fastboot flash boot_a boot.img' \
-            '   fastboot flash vendor_boot_a vendor_boot.img' \
+            '   fastboot flash vendor_boot_a <STOCK-vendor_boot.img>' \
             '   fastboot set_active a' \
             '   fastboot reboot' \
             '' \
-            'If stuck, restore stock boot + vendor_boot then reboot.' \
+            '3. Expect logo for a while (no display driver yet).' \
+            '4. If stuck: restore stock boot_a + vendor_boot_a, reboot, then' \
+            '   check /sys/fs/pstore/ for ramoops from the failed boot.' \
             | sudo tee $EXP/FLASHING.txt > /dev/null
 
           echo "=== Artifact contents ==="
