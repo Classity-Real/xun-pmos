@@ -84,6 +84,30 @@ jobs:
       - name: Build device package
         run: sudo -E pmbootstrap --as-root build --force device-xiaomi-xun
 
+      - name: Prepare loop devices
+        run: |
+          set -e
+          # Namespace runners often lack /dev/loop* nodes; pmbootstrap install needs them.
+          sudo modprobe loop 2>/dev/null || true
+          for i in $(seq 0 15); do
+            if [ ! -e "/dev/loop$i" ]; then
+              sudo mknod -m 666 "/dev/loop$i" b 7 "$i"
+            fi
+          done
+          if [ ! -e /dev/loop-control ]; then
+            sudo mknod -m 666 /dev/loop-control c 10 237 2>/dev/null || true
+          fi
+          echo "=== loop devices ==="
+          ls -la /dev/loop* 2>/dev/null || true
+          sudo losetup -a || true
+          # Smoke-test: attach/detach a tiny file
+          dd if=/dev/zero of=/tmp/looptest.img bs=1M count=1 status=none
+          LOOP=$(sudo losetup -f --show /tmp/looptest.img)
+          echo "attached $LOOP"
+          sudo losetup -d "$LOOP"
+          rm -f /tmp/looptest.img
+          echo "loop setup OK"
+
       - name: Install
         run: sudo -E pmbootstrap --as-root install --password=147147
 
