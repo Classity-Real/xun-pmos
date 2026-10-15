@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04-arm
+    runs-on: namespace-profile-normal
     timeout-minutes: 120
 
     steps:
@@ -60,7 +60,7 @@ jobs:
           sudo mkdir -p /root/.config
           printf '%s\n' \
             '[pmbootstrap]' \
-            'aports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports' \
+            "aports = $HOME/.local/var/pmbootstrap/cache_git/pmaports" \
             'build_default_device_arch = False' \
             'ccache_size = 5G' \
             'device = xiaomi-xun' \
@@ -69,14 +69,14 @@ jobs:
             'kernel = mainline' \
             'service_manager = openrc' \
             'ui = none' \
-            'work = /home/runner/.local/var/pmbootstrap' \
+            "work = $HOME/.local/var/pmbootstrap" \
             > $HOME/.config/pmbootstrap_v3.cfg
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
 
       - name: Prepare ccache dir
         run: |
-          sudo mkdir -p /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
-          sudo chmod -R 777 /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
+          sudo mkdir -p $HOME/.local/var/pmbootstrap/cache_ccache_aarch64
+          sudo chmod -R 777 $HOME/.local/var/pmbootstrap/cache_ccache_aarch64
 
       - name: Build kernel
         run: sudo -E pmbootstrap --as-root build --force linux-postmarketos-qcom-sm6225
@@ -98,14 +98,11 @@ jobs:
 
           echo "--- boot.img header before patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
-          # os_version / os_patch_level patch used previously
           echo 99010020 | xxd -r -p | sudo dd of=$EXP/boot.img bs=1 seek=16 count=4 conv=notrunc
           echo "--- boot.img header after patch ---"
           sudo xxd -l 48 $EXP/boot.img || true
           sudo cp -a $EXP/boot.img $EXP/recovery.img
 
-          # Xiaomi rejects any non-stock vendor_boot (even 96MB padded).
-          # Strategy: stock vendor_boot + boot.img with append_dtb + head.S ignore FDT.
           sudo rm -f $EXP/vendor_boot.img
 
           DTB=""
@@ -119,7 +116,6 @@ jobs:
           fi
           echo "DTB: $DTB ($(sudo stat -c%s "$DTB") bytes)"
 
-          # Sanity: boot.img should be larger than a bare Image if append_dtb worked
           BOOT_SZ=$(sudo stat -c%s $EXP/boot.img)
           echo "boot.img size: $BOOT_SZ"
           if [ "$BOOT_SZ" -lt 10000000 ]; then
@@ -155,7 +151,7 @@ jobs:
 
       - name: Check ccache state
         if: always()
-        run: sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
+        run: sudo du -sh $HOME/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
 
       - name: Verify export contents
         if: always()
@@ -168,9 +164,9 @@ jobs:
         run: |
           echo "=========== REAL ERRORS ==========="
           sudo grep -nE "error:|Error 1|>>> ERROR|No rule to make|undefined reference|FATAL ERROR|dtc:|Reference to non-existent" \
-            /home/runner/.local/var/pmbootstrap/log.txt | tail -40 || true
+            $HOME/.local/var/pmbootstrap/log.txt | tail -40 || true
           echo "=========== last 40 lines ==========="
-          sudo tail -n 40 /home/runner/.local/var/pmbootstrap/log.txt || true
+          sudo tail -n 40 $HOME/.local/var/pmbootstrap/log.txt || true
 
       - name: Fix artifact permissions
         if: always()
