@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: namespace-profile-normal
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
 
     steps:
@@ -60,7 +60,7 @@ jobs:
           sudo mkdir -p /root/.config
           printf '%s\n' \
             '[pmbootstrap]' \
-            "aports = $HOME/.local/var/pmbootstrap/cache_git/pmaports" \
+            'aports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports' \
             'build_default_device_arch = False' \
             'ccache_size = 5G' \
             'device = xiaomi-xun' \
@@ -69,44 +69,20 @@ jobs:
             'kernel = mainline' \
             'service_manager = openrc' \
             'ui = none' \
-            "work = $HOME/.local/var/pmbootstrap" \
+            'work = /home/runner/.local/var/pmbootstrap' \
             > $HOME/.config/pmbootstrap_v3.cfg
           sudo cp $HOME/.config/pmbootstrap_v3.cfg /root/.config/pmbootstrap_v3.cfg
 
       - name: Prepare ccache dir
         run: |
-          sudo mkdir -p $HOME/.local/var/pmbootstrap/cache_ccache_aarch64
-          sudo chmod -R 777 $HOME/.local/var/pmbootstrap/cache_ccache_aarch64
+          sudo mkdir -p /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
+          sudo chmod -R 777 /home/runner/.local/var/pmbootstrap/cache_ccache_aarch64
 
       - name: Build kernel
         run: sudo -E pmbootstrap --as-root build --force linux-postmarketos-qcom-sm6225
 
       - name: Build device package
         run: sudo -E pmbootstrap --as-root build --force device-xiaomi-xun
-
-      - name: Prepare loop devices
-        run: |
-          set -e
-          # Namespace runners often lack /dev/loop* nodes; pmbootstrap install needs them.
-          sudo modprobe loop 2>/dev/null || true
-          for i in $(seq 0 15); do
-            if [ ! -e "/dev/loop$i" ]; then
-              sudo mknod -m 666 "/dev/loop$i" b 7 "$i"
-            fi
-          done
-          if [ ! -e /dev/loop-control ]; then
-            sudo mknod -m 666 /dev/loop-control c 10 237 2>/dev/null || true
-          fi
-          echo "=== loop devices ==="
-          ls -la /dev/loop* 2>/dev/null || true
-          sudo losetup -a || true
-          # Smoke-test: attach/detach a tiny file
-          dd if=/dev/zero of=/tmp/looptest.img bs=1M count=1 status=none
-          LOOP=$(sudo losetup -f --show /tmp/looptest.img)
-          echo "attached $LOOP"
-          sudo losetup -d "$LOOP"
-          rm -f /tmp/looptest.img
-          echo "loop setup OK"
 
       - name: Install
         run: sudo -E pmbootstrap --as-root install --password=147147
@@ -175,7 +151,7 @@ jobs:
 
       - name: Check ccache state
         if: always()
-        run: sudo du -sh $HOME/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
+        run: sudo du -sh /home/runner/.local/var/pmbootstrap/cache_ccache 2>/dev/null || echo "MISSING"
 
       - name: Verify export contents
         if: always()
@@ -188,9 +164,9 @@ jobs:
         run: |
           echo "=========== REAL ERRORS ==========="
           sudo grep -nE "error:|Error 1|>>> ERROR|No rule to make|undefined reference|FATAL ERROR|dtc:|Reference to non-existent" \
-            $HOME/.local/var/pmbootstrap/log.txt | tail -40 || true
+            /home/runner/.local/var/pmbootstrap/log.txt | tail -40 || true
           echo "=========== last 40 lines ==========="
-          sudo tail -n 40 $HOME/.local/var/pmbootstrap/log.txt || true
+          sudo tail -n 40 /home/runner/.local/var/pmbootstrap/log.txt || true
 
       - name: Fix artifact permissions
         if: always()
